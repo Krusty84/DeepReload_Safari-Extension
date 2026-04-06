@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Whole Page Settings</title>
+  <link rel="stylesheet" href="settings.css">
+  <script type="module" src="settings.js"></script>
+</head>
+<body>
+  <main class="panel">
+    <header class="panel-header">
+      <h1>Whole Page Settings</h1>
+    </header>
+
+    <section class="section">
+      <h2>Behavior</h2>
+
+      <label class="setting-row" for="enable-page-reload">
+        <span class="setting-copy">
+          <span class="setting-title">Whole Page</span>
+          <span class="setting-subtitle">Enable the whole-page reload action for the current tab.</span>
+        </span>
+        <span class="switch-wrap">
+          <input id="enable-page-reload" type="checkbox">
+          <span class="switch" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="setting-row" for="enable-element-reload">
+        <span class="setting-copy">
+          <span class="setting-title">Element Under Cursor</span>
+          <span class="setting-subtitle">Enable the element-level reload action for the current cursor target.</span>
+        </span>
+        <span class="switch-wrap">
+          <input id="enable-element-reload" type="checkbox">
+          <span class="switch" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="setting-row" for="enable-auto-reload-fallback">
+        <span class="setting-copy">
+          <span class="setting-title">Auto reload fallback</span>
+          <span class="setting-subtitle">Automatically reload the whole page when element reload is not applicable.</span>
+        </span>
+        <span class="switch-wrap">
+          <input id="enable-auto-reload-fallback" type="checkbox">
+          <span class="switch" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="input-row" for="auto-reload-interval-sec">
+        <span class="setting-copy">
+          <span class="setting-title">Automatic reload interval (sec)</span>
+          <span class="setting-subtitle">Used by Automatic submenu actions.</span>
+        </span>
+        <input id="auto-reload-interval-sec" type="number" min="5" max="3600" step="1">
+      </label>
+
+      <label class="setting-row" for="enable-element-highlight">
+        <span class="setting-copy">
+          <span class="setting-title">Highlight selected element</span>
+          <span class="setting-subtitle">Show visual outline/background on right-click target.</span>
+        </span>
+        <span class="switch-wrap">
+          <input id="enable-element-highlight" type="checkbox">
+          <span class="switch" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="input-row" for="highlight-color">
+        <span class="setting-copy">
+          <span class="setting-title">Highlight color</span>
+          <span class="setting-subtitle">Color used for selected element outline and background.</span>
+        </span>
+        <input id="highlight-color" type="color" value="#ff00ff">
+      </label>
+    </section>
+
+    <section class="section">
+      <h2>Notifications</h2>
+
+      <label class="setting-row" for="enable-toast-notification">
+        <span class="setting-copy">
+          <span class="setting-title">Toast notifications</span>
+          <span class="setting-subtitle">Show reload status and debug report overlays in page.</span>
+        </span>
+        <span class="switch-wrap">
+          <input id="enable-toast-notification" type="checkbox">
+          <span class="switch" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="input-row" for="toast-duration-ms">
+        <span class="setting-copy">
+          <span class="setting-title">Toast visibility time (ms)</span>
+          <span class="setting-subtitle">Applies to debug report auto-hide delay.</span>
+        </span>
+        <input id="toast-duration-ms" type="number" min="1000" max="15000" step="100">
+      </label>
+    </section>
+
+    <p id="save-status" class="save-status" role="status" aria-live="polite">Ready</p>
+  </main>
+</body>
+</html>
