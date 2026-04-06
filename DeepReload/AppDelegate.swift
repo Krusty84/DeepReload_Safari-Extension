@@ -5,20 +5,21 @@
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
 
-import UIKit
+import AppKit
+import SafariServices
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate {
 
-    var window: UIWindow?
-
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
-        return true
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        SFSafariApplication.showPreferencesForExtension(withIdentifier: "com.krusty84.DeepReload.Extension") { error in
+            if let error = error {
+                print("Ошибка открытия настроек расширения: \(error.localizedDescription)")
+            }
+        }
     }
 
-    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
-        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
     }
-
 }
