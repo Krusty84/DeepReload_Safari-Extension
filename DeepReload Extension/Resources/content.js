@@ -1058,6 +1058,19 @@ function isPageSurfaceElement(element) {
   return element === document.body || element === document.documentElement;
 }
 
+function getElementDisplayName(element) {
+  if (!(element instanceof Element) || typeof element.tagName !== "string") {
+    return "element";
+  }
+
+  return element.tagName.toLowerCase();
+}
+
+function buildStaticElementRefreshNote(element) {
+  const elementName = getElementDisplayName(element);
+  return `The selected ${elementName} is static content and can't be refreshed individually. Refresh the whole page instead.`;
+}
+
 function highlightElement(element) {
   const resolvedElement = resolveElementTarget(element);
 
@@ -1813,10 +1826,19 @@ async function reloadElementUnderCursor(element, options = {}) {
     );
 
     if (!handledAnyReload) {
+      if (!automatic) {
+        showDebugReport({
+          mode: "Element Under Cursor",
+          mediaReloaded: 0,
+          inlineStylesUpdated: 0,
+          note: buildStaticElementRefreshNote(targetElement)
+        });
+      }
+
       return {
         handled: false,
-        fallbackToPageReload: true,
-        reason: "no-reloadable-resources",
+        fallbackToPageReload: automatic,
+        reason: automatic ? "no-reloadable-resources" : "static-element-not-refreshable",
         mediaReloaded: 0,
         inlineStylesUpdated: 0
       };
