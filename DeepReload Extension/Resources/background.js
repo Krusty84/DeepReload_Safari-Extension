@@ -10,7 +10,6 @@ const MENU_WHOLE_PAGE_ID = "whole-page";
 const MENU_ELEMENT_UNDER_CURSOR_ID = "element-under-cursor";
 const MENU_AUTOMATIC_ROOT_ID = "automatic-root";
 const MENU_AUTOMATIC_WHOLE_PAGE_ID = "automatic-whole-page";
-const MENU_AUTOMATIC_ELEMENT_UNDER_CURSOR_ID = "automatic-element-under-cursor";
 const MENU_AUTOMATIC_RESET_ID = "automatic-reset";
 const AUTO_RELOAD_INTERVAL_MIN_SEC = 5;
 const AUTO_RELOAD_INTERVAL_MAX_SEC = 3600;
@@ -33,7 +32,7 @@ if (existingBackgroundRuntime && typeof existingBackgroundRuntime.cleanup === "f
   try {
     existingBackgroundRuntime.cleanup();
   } catch (error) {
-    console.warn("WholePage: Failed to clean up previous background runtime", error);
+    console.warn("Deep Reload: Failed to clean up previous background runtime", error);
   }
 }
 
@@ -57,7 +56,7 @@ function addExtensionListener(eventSource, handler) {
         eventSource.removeListener(handler);
       }
     } catch (error) {
-      console.warn("WholePage: Failed to remove background listener", error);
+      console.warn("Deep Reload: Failed to remove background listener", error);
     }
   });
 }
@@ -99,7 +98,7 @@ async function replaceCurrentTabUrl(tabId, url) {
     });
     return true;
   } catch (error) {
-    console.warn("WholePage: location.replace execution failed", error);
+    console.warn("Deep Reload: location.replace execution failed", error);
     return false;
   }
 }
@@ -141,31 +140,23 @@ async function applyContextMenuSettingsInner() {
   if (settings.enableAutoReloadFallback) {
     browser.contextMenus.create({
       id: MENU_AUTOMATIC_ROOT_ID,
-      title: "Automatic",
-      contexts: ["all"],
-      enabled: settings.enableDeepReloadPage || settings.enableDeepReloadElement
-    });
-
-    browser.contextMenus.create({
-      id: MENU_AUTOMATIC_WHOLE_PAGE_ID,
-      parentId: MENU_AUTOMATIC_ROOT_ID,
-      title: "Whole Page",
+      title: "Automatic Whole Page",
       contexts: ["all"],
       enabled: settings.enableDeepReloadPage
     });
 
     browser.contextMenus.create({
-      id: MENU_AUTOMATIC_ELEMENT_UNDER_CURSOR_ID,
+      id: MENU_AUTOMATIC_WHOLE_PAGE_ID,
       parentId: MENU_AUTOMATIC_ROOT_ID,
-      title: "Element Under Cursor",
+      title: "Start",
       contexts: ["all"],
-      enabled: settings.enableDeepReloadElement
+      enabled: settings.enableDeepReloadPage
     });
 
     browser.contextMenus.create({
       id: MENU_AUTOMATIC_RESET_ID,
       parentId: MENU_AUTOMATIC_ROOT_ID,
-      title: "Reset",
+      title: "Stop",
       contexts: ["all"],
       enabled: true
     });
@@ -176,7 +167,7 @@ function applyContextMenuSettings() {
   contextMenuUpdatePromise = contextMenuUpdatePromise
     .then(() => applyContextMenuSettingsInner())
     .catch((error) => {
-      console.warn("WholePage: Failed to apply context menu settings", error);
+      console.warn("Deep Reload: Failed to apply context menu settings", error);
     });
 
   return contextMenuUpdatePromise;
@@ -195,7 +186,7 @@ async function handleWholePageReload(tab, reportContext = null) {
       );
     }
   } catch (error) {
-    console.warn("WholePage: prepareWholePageReload message failed", error);
+    console.warn("Deep Reload: prepareWholePageReload message failed", error);
   }
 
   const cacheBustedUrl = buildCacheBustedUrl(tab.url, Date.now());
@@ -210,12 +201,12 @@ async function handleWholePageReload(tab, reportContext = null) {
       await browser.tabs.update(tab.id, { url: cacheBustedUrl });
       return true;
     } catch (updateError) {
-      console.warn("WholePage: cache-busted navigation failed, fallback to tabs.reload", updateError);
+      console.warn("Deep Reload: cache-busted navigation failed, fallback to tabs.reload", updateError);
       try {
         await browser.tabs.reload(tab.id, { bypassCache: true });
         return true;
       } catch (reloadError) {
-        console.warn("WholePage: tabs.reload failed after cache-busted navigation fallback", reloadError);
+        console.warn("Deep Reload: tabs.reload failed after cache-busted navigation fallback", reloadError);
         return false;
       }
     }
@@ -226,7 +217,7 @@ async function handleWholePageReload(tab, reportContext = null) {
     await browser.tabs.reload(tab.id, { bypassCache: true });
     return true;
   } catch (error) {
-    console.warn("WholePage: tabs.reload failed", error);
+    console.warn("Deep Reload: tabs.reload failed", error);
     return false;
   }
 }
@@ -236,7 +227,7 @@ async function handleElementUnderCursorReload(tab) {
   try {
     return await browser.tabs.sendMessage(tab.id, { action: "reloadElementUnderCursor" });
   } catch (error) {
-    console.warn("WholePage: reloadElementUnderCursor message failed", error);
+    console.warn("Deep Reload: reloadElementUnderCursor message failed", error);
     return {
       handled: false,
       fallbackToPageReload: true,
@@ -245,15 +236,15 @@ async function handleElementUnderCursorReload(tab) {
   }
 }
 
-async function toggleAutomaticReload(tab, mode, settings) {
+async function toggleAutomaticReload(tab, settings) {
   try {
     return await browser.tabs.sendMessage(tab.id, {
       action: "toggleAutomaticReload",
-      mode,
+      mode: "page",
       intervalMs: settings.autoReloadIntervalSec * 1000
     });
   } catch (error) {
-    console.warn("WholePage: toggleAutomaticReload message failed", error);
+    console.warn("Deep Reload: toggleAutomaticReload message failed", error);
     return null;
   }
 }
@@ -264,7 +255,7 @@ async function resetAutomaticReload(tab) {
       action: "resetAutomaticReload"
     });
   } catch (error) {
-    console.warn("WholePage: resetAutomaticReload message failed", error);
+    console.warn("Deep Reload: resetAutomaticReload message failed", error);
     return null;
   }
 }
@@ -277,7 +268,7 @@ async function handleContextMenuClicked(info, tab) {
   try {
     settings = await readSettings();
   } catch (error) {
-    console.warn("WholePage: Failed to read settings on menu click", error);
+    console.warn("Deep Reload: Failed to read settings on menu click", error);
     settings = normalizeSettings(DEFAULT_SETTINGS);
   }
   if (!isBackgroundRuntimeActive()) return;
@@ -290,25 +281,13 @@ async function handleContextMenuClicked(info, tab) {
 
   if (info.menuItemId === MENU_ELEMENT_UNDER_CURSOR_ID) {
     if (!settings.enableDeepReloadElement) return;
-    const elementResult = await handleElementUnderCursorReload(tab);
-    if (settings.enableAutoReloadFallback && elementResult?.fallbackToPageReload === true) {
-      await handleWholePageReload(tab, {
-        mode: "Element Under Cursor",
-        note: "Fallback reloaded Whole Page"
-      });
-    }
+    await handleElementUnderCursorReload(tab);
     return;
   }
 
   if (info.menuItemId === MENU_AUTOMATIC_WHOLE_PAGE_ID) {
     if (!settings.enableDeepReloadPage) return;
-    await toggleAutomaticReload(tab, "page", settings);
-    return;
-  }
-
-  if (info.menuItemId === MENU_AUTOMATIC_ELEMENT_UNDER_CURSOR_ID) {
-    if (!settings.enableDeepReloadElement) return;
-    await toggleAutomaticReload(tab, "element", settings);
+    await toggleAutomaticReload(tab, settings);
     return;
   }
 
@@ -329,7 +308,7 @@ function handleRuntimeMessage(message, sender) {
     try {
       settings = await readSettings();
     } catch (error) {
-      console.warn("WholePage: Failed to read settings for automatic whole-page reload", error);
+      console.warn("Deep Reload: Failed to read settings for automatic whole-page reload", error);
       settings = normalizeSettings(DEFAULT_SETTINGS);
     }
     if (!isBackgroundRuntimeActive()) {
@@ -340,7 +319,10 @@ function handleRuntimeMessage(message, sender) {
       return { triggered: false, reason: "page-reload-disabled" };
     }
 
-    const didTrigger = await handleWholePageReload(sender.tab);
+    const didTrigger = await handleWholePageReload(sender.tab, {
+      mode: "Automatic",
+      suppressReport: true
+    });
     return { triggered: didTrigger === true };
   })();
 }
@@ -375,7 +357,7 @@ function disposeBackgroundRuntime() {
     try {
       removeListener();
     } catch (error) {
-      console.warn("WholePage: Failed while disposing background listener", error);
+      console.warn("Deep Reload: Failed while disposing background listener", error);
     }
   });
 

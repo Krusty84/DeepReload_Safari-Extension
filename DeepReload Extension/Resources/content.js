@@ -21,7 +21,9 @@ let highlightResizeObserver = null;
 let automaticReloadMode = null;
 let automaticReloadIntervalMs = 0;
 let automaticReloadTimer = null;
-let automaticReloadElementLocator = null;
+let automaticReloadNextAtMs = 0;
+let automaticReloadBannerElement = null;
+let automaticReloadCountdownTimer = null;
 let automaticReloadToken = 0;
 const managedTimeoutIds = new Set();
 const CONTENT_RUNTIME_KEY = "__wholepage_content_runtime__";
@@ -31,7 +33,7 @@ if (existingContentRuntime && typeof existingContentRuntime.cleanup === "functio
   try {
     existingContentRuntime.cleanup();
   } catch (error) {
-    console.warn("WholePage: Failed to clean up previous content runtime", error);
+    console.warn("Deep Reload: Failed to clean up previous content runtime", error);
   }
 }
 
@@ -53,6 +55,7 @@ const TOAST_DURATION_MAX_MS = 15000;
 const AUTO_RELOAD_INTERVAL_MIN_SEC = 5;
 const AUTO_RELOAD_INTERVAL_MAX_SEC = 3600;
 const AUTO_PAGE_BLINK_MAX_AGE_MS = 20000;
+const AUTOMATIC_RELOAD_BANNER_UPDATE_MS = 1000;
 const HIGHLIGHT_BORDER_WIDTH_PX = 3;
 const HIGHLIGHT_OVERLAY_PADDING_PX = 2;
 const HIGHLIGHT_MAX_RECT_COUNT = 24;
@@ -95,7 +98,7 @@ function addExtensionListener(eventSource, handler) {
         eventSource.removeListener(handler);
       }
     } catch (error) {
-      console.warn("WholePage: Failed to remove extension listener", error);
+      console.warn("Deep Reload: Failed to remove extension listener", error);
     }
   });
 }
@@ -138,6 +141,10 @@ function normalizeReportContext(value) {
 
   if (typeof value.note === "string" && value.note.trim()) {
     normalized.note = value.note.trim();
+  }
+
+  if (value.suppressReport === true) {
+    normalized.suppressReport = true;
   }
 
   return Object.keys(normalized).length > 0 ? normalized : null;
@@ -331,9 +338,6 @@ function applyRuntimeSettingsPatch(patch) {
 
   if (!runtimeSettings.enableDeepReloadElement) {
     clearSelectedElement();
-    if (automaticReloadMode === "element") {
-      stopAutomaticReload();
-    }
   }
 
   if (!runtimeSettings.enableDeepReloadPage && automaticReloadMode === "page") {
@@ -348,6 +352,13 @@ function applyRuntimeSettingsPatch(patch) {
     stopAutomaticReload();
   }
 
+  if (runtimeSettings.enableAutoReloadFallback && automaticReloadMode === "page" && runtimeSettings.enableDeepReloadPage) {
+    renderAutomaticReloadBanner();
+    startAutomaticReloadCountdown();
+  } else {
+    hideAutomaticReloadBanner();
+  }
+
   if (runtimeSettings.enableDeepReloadElement && runtimeSettings.enableElementHighlight && currentHighlightedElement) {
     syncHighlightOverlay();
   }
@@ -359,7 +370,7 @@ async function loadSettingsFromStorage() {
     if (!isRuntimeActive()) return;
     applyRuntimeSettingsPatch(stored);
   } catch (error) {
-    console.warn("WholePage: Failed to load runtime settings", error);
+    console.warn("Deep Reload: Failed to load runtime settings", error);
     if (!isRuntimeActive()) return;
     applyRuntimeSettingsPatch(DEFAULT_SETTINGS);
   }
@@ -583,27 +594,24 @@ function clearSelectedElement() {
   removeHighlight();
 }
 
-function clearAutomaticElementLocator() {
-  automaticReloadElementLocator = null;
-}
-
-function cleanupTransientReferences({ preserveAutomaticElementLocator = false } = {}) {
+function cleanupTransientReferences() {
   clearSelectedElement();
-
-  if (!preserveAutomaticElementLocator) {
-    clearAutomaticElementLocator();
-  }
 }
 
 function normalizeAutomaticReloadMode(mode) {
-  if (mode === "page" || mode === "element") return mode;
-  return null;
+  return mode === "page" ? "page" : null;
 }
 
 function clearAutomaticReloadTimer() {
   if (!automaticReloadTimer) return;
   clearTimeout(automaticReloadTimer);
   automaticReloadTimer = null;
+}
+
+function clearAutomaticReloadCountdownTimer() {
+  if (!automaticReloadCountdownTimer) return;
+  clearInterval(automaticReloadCountdownTimer);
+  automaticReloadCountdownTimer = null;
 }
 
 function isAutomaticReloadActive(mode, intervalMs, token) {
@@ -614,12 +622,96 @@ function isAutomaticReloadActive(mode, intervalMs, token) {
   );
 }
 
+function ensureAutomaticReloadBannerElement() {
+  if (automaticReloadBannerElement && automaticReloadBannerElement.isConnected) {
+    return automaticReloadBannerElement;
+  }
+
+  const banner = document.createElement("div");
+  banner.setAttribute("data-wholepage-automatic-banner", "true");
+  banner.style.position = "fixed";
+  banner.style.top = "14px";
+  banner.style.right = "14px";
+  banner.style.zIndex = "2147483647";
+  banner.style.maxWidth = "340px";
+  banner.style.padding = "10px 12px";
+  banner.style.borderRadius = "12px";
+  banner.style.background = "rgba(15, 19, 27, 0.92)";
+  banner.style.color = "#f5f8ff";
+  banner.style.font = '500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  banner.style.lineHeight = "1.45";
+  banner.style.letterSpacing = "0.2px";
+  banner.style.whiteSpace = "pre-line";
+  banner.style.pointerEvents = "none";
+  banner.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.28)";
+  banner.style.border = "1px solid rgba(255, 255, 255, 0.14)";
+  banner.style.opacity = "0";
+  banner.style.display = "none";
+  banner.style.transition = "opacity 0.18s ease";
+
+  document.documentElement.appendChild(banner);
+  automaticReloadBannerElement = banner;
+  return banner;
+}
+
+function formatAutomaticReloadCountdown(remainingMs) {
+  const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(remainingSec / 60);
+  const seconds = remainingSec % 60;
+
+  if (minutes <= 0) {
+    return `${seconds}s`;
+  }
+
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function renderAutomaticReloadBanner() {
+  if (automaticReloadMode !== "page" || automaticReloadIntervalMs <= 0 || automaticReloadNextAtMs <= 0) {
+    if (automaticReloadBannerElement) {
+      automaticReloadBannerElement.style.opacity = "0";
+      automaticReloadBannerElement.style.display = "none";
+    }
+    return;
+  }
+
+  const banner = ensureAutomaticReloadBannerElement();
+  const remainingMs = Math.max(0, automaticReloadNextAtMs - Date.now());
+  const countdownText = formatAutomaticReloadCountdown(remainingMs);
+  banner.textContent = `Automatic Whole Page refresh is on.\nNext refresh in ${countdownText}.`;
+  banner.style.display = "block";
+  banner.style.opacity = "1";
+}
+
+function startAutomaticReloadCountdown() {
+  clearAutomaticReloadCountdownTimer();
+  renderAutomaticReloadBanner();
+
+  if (automaticReloadMode !== "page" || automaticReloadIntervalMs <= 0 || automaticReloadNextAtMs <= 0) {
+    return;
+  }
+
+  automaticReloadCountdownTimer = setInterval(() => {
+    if (!isRuntimeActive()) return;
+    renderAutomaticReloadBanner();
+  }, AUTOMATIC_RELOAD_BANNER_UPDATE_MS);
+}
+
+function hideAutomaticReloadBanner() {
+  clearAutomaticReloadCountdownTimer();
+
+  if (!automaticReloadBannerElement) return;
+  automaticReloadBannerElement.style.opacity = "0";
+  automaticReloadBannerElement.style.display = "none";
+}
+
 function persistAutomaticReloadState() {
   try {
     if (automaticReloadMode === "page" && automaticReloadIntervalMs > 0) {
       sessionStorage.setItem(AUTO_RELOAD_STATE_STORAGE_KEY, JSON.stringify({
         mode: "page",
         intervalMs: automaticReloadIntervalMs,
+        nextReloadAt: automaticReloadNextAtMs,
         createdAt: Date.now()
       }));
       return;
@@ -627,7 +719,7 @@ function persistAutomaticReloadState() {
 
     sessionStorage.removeItem(AUTO_RELOAD_STATE_STORAGE_KEY);
   } catch (error) {
-    console.warn("WholePage: Failed to persist automatic reload state", error);
+    console.warn("Deep Reload: Failed to persist automatic reload state", error);
   }
 }
 
@@ -635,9 +727,11 @@ function stopAutomaticReload({ clearPersistedState = true } = {}) {
   const previousMode = automaticReloadMode;
   automaticReloadToken += 1;
   clearAutomaticReloadTimer();
+  clearAutomaticReloadCountdownTimer();
   automaticReloadMode = null;
   automaticReloadIntervalMs = 0;
-  clearAutomaticElementLocator();
+  automaticReloadNextAtMs = 0;
+  hideAutomaticReloadBanner();
 
   try {
     if (clearPersistedState || previousMode !== "page") {
@@ -645,7 +739,7 @@ function stopAutomaticReload({ clearPersistedState = true } = {}) {
     }
     sessionStorage.removeItem(AUTO_PAGE_BLINK_STORAGE_KEY);
   } catch (error) {
-    console.warn("WholePage: Failed to clear automatic reload state", error);
+    console.warn("Deep Reload: Failed to clear automatic reload state", error);
   }
 }
 
@@ -708,86 +802,63 @@ function consumePendingAutoPageBlink() {
 
     blinkPage();
   } catch (error) {
-    console.warn("WholePage: Failed to consume auto page blink marker", error);
+    console.warn("Deep Reload: Failed to consume auto page blink marker", error);
   }
 }
 
-function scheduleAutomaticReload(expectedToken = automaticReloadToken) {
+function scheduleAutomaticReload(expectedToken = automaticReloadToken, nextReloadAtMs = Date.now() + automaticReloadIntervalMs) {
   clearAutomaticReloadTimer();
 
-  if (!automaticReloadMode || automaticReloadIntervalMs <= 0) return;
+  if (automaticReloadMode !== "page" || automaticReloadIntervalMs <= 0) {
+    hideAutomaticReloadBanner();
+    return;
+  }
 
   const mode = automaticReloadMode;
   const intervalMs = automaticReloadIntervalMs;
+  automaticReloadNextAtMs = Number.isFinite(nextReloadAtMs) ? nextReloadAtMs : Date.now() + intervalMs;
+  persistAutomaticReloadState();
+  startAutomaticReloadCountdown();
 
   automaticReloadTimer = setTimeout(async () => {
     if (!isRuntimeActive()) return;
     if (!isAutomaticReloadActive(mode, intervalMs, expectedToken)) return;
-
-    if (mode === "element") {
-      try {
-        if (runtimeSettings.enableDeepReloadElement) {
-          const automaticTargetElement = resolveElementLocator(automaticReloadElementLocator);
-          const result = await reloadElementUnderCursor(automaticTargetElement, { automatic: true });
-          if (result?.handled !== true) {
-            stopAutomaticReload();
-            clearSelectedElement();
-            showDebugReport({
-              mode: "Automatic",
-              note: `Stopped (${result?.reason || "element reload no longer possible"})`
-            });
-            return;
-          }
-        }
-      } catch (error) {
-        console.warn("WholePage: Automatic element reload failed", error);
-      }
-      if (isAutomaticReloadActive(mode, intervalMs, expectedToken)) {
-        scheduleAutomaticReload(expectedToken);
-      }
+    if (!runtimeSettings.enableDeepReloadPage) {
+      stopAutomaticReload();
       return;
     }
 
-    if (mode === "page") {
-      if (!isAutomaticReloadActive(mode, intervalMs, expectedToken)) return;
-      if (!runtimeSettings.enableDeepReloadPage) {
-        stopAutomaticReload();
-        return;
-      }
+    if (!isAutomaticReloadActive(mode, intervalMs, expectedToken)) return;
+    hideAutomaticReloadBanner();
+    try {
+      automaticReloadNextAtMs = Date.now() + intervalMs;
+      sessionStorage.setItem(AUTO_PAGE_BLINK_STORAGE_KEY, JSON.stringify({ createdAt: Date.now() }));
+      persistAutomaticReloadState();
+    } catch (error) {
+      console.warn("Deep Reload: Failed to set automatic whole-page reload markers", error);
+    }
 
-      if (!isAutomaticReloadActive(mode, intervalMs, expectedToken)) return;
-      try {
-        sessionStorage.setItem(AUTO_PAGE_BLINK_STORAGE_KEY, JSON.stringify({ createdAt: Date.now() }));
-        persistAutomaticReloadState();
-      } catch (error) {
-        console.warn("WholePage: Failed to set automatic whole-page reload markers", error);
+    if (!isAutomaticReloadActive(mode, intervalMs, expectedToken)) return;
+    try {
+      const triggerResult = await browser.runtime.sendMessage({ action: "triggerAutoWholePageReload" });
+      if (triggerResult?.triggered !== true && isAutomaticReloadActive(mode, intervalMs, expectedToken)) {
+        scheduleAutomaticReload(expectedToken);
       }
-
-      if (!isAutomaticReloadActive(mode, intervalMs, expectedToken)) return;
-      try {
-        const triggerResult = await browser.runtime.sendMessage({ action: "triggerAutoWholePageReload" });
-        if (triggerResult?.triggered !== true && isAutomaticReloadActive(mode, intervalMs, expectedToken)) {
-          scheduleAutomaticReload(expectedToken);
-        }
-      } catch (error) {
-        console.warn("WholePage: Failed to trigger automatic whole-page reload", error);
-        if (isAutomaticReloadActive(mode, intervalMs, expectedToken)) {
-          scheduleAutomaticReload(expectedToken);
-        }
+    } catch (error) {
+      console.warn("Deep Reload: Failed to trigger automatic whole-page reload", error);
+      if (isAutomaticReloadActive(mode, intervalMs, expectedToken)) {
+        scheduleAutomaticReload(expectedToken);
       }
     }
-  }, intervalMs);
+  }, Math.max(0, automaticReloadNextAtMs - Date.now()));
 }
 
-function startAutomaticReload(mode, intervalMs) {
+function startAutomaticReload(intervalMs, nextReloadAtMs = Date.now() + intervalMs) {
   automaticReloadToken += 1;
-  automaticReloadMode = mode;
+  automaticReloadMode = "page";
   automaticReloadIntervalMs = intervalMs;
-  if (mode !== "element") {
-    clearAutomaticElementLocator();
-  }
-  persistAutomaticReloadState();
-  scheduleAutomaticReload(automaticReloadToken);
+  automaticReloadNextAtMs = Number.isFinite(nextReloadAtMs) ? nextReloadAtMs : Date.now() + intervalMs;
+  scheduleAutomaticReload(automaticReloadToken, automaticReloadNextAtMs);
 }
 
 function restoreAutomaticPageReloadState() {
@@ -800,21 +871,25 @@ function restoreAutomaticPageReloadState() {
     if (parsed.mode !== "page") return;
 
     const intervalSec = clampAutoReloadIntervalSec(Math.round(Number(parsed.intervalMs) / 1000));
+    const storedNextReloadAt = Number(parsed.nextReloadAt);
+    const nextReloadAtMs = Number.isFinite(storedNextReloadAt)
+      ? Math.max(Date.now(), storedNextReloadAt)
+      : Date.now() + (intervalSec * 1000);
     if (!runtimeSettings.enableAutoReloadFallback || !runtimeSettings.enableDeepReloadPage) {
       sessionStorage.removeItem(AUTO_RELOAD_STATE_STORAGE_KEY);
       return;
     }
 
-    startAutomaticReload("page", intervalSec * 1000);
+    startAutomaticReload(intervalSec * 1000, nextReloadAtMs);
   } catch (error) {
-    console.warn("WholePage: Failed to restore automatic reload state", error);
+    console.warn("Deep Reload: Failed to restore automatic reload state", error);
   }
 }
 
 function toggleAutomaticReload(mode, intervalMs) {
   const normalizedMode = normalizeAutomaticReloadMode(mode);
   if (!normalizedMode) {
-    return { started: false, stopped: false, reason: "invalid-mode" };
+    return { started: false, stopped: false, reason: "automatic-page-only" };
   }
 
   if (!runtimeSettings.enableAutoReloadFallback) {
@@ -825,46 +900,24 @@ function toggleAutomaticReload(mode, intervalMs) {
     return { started: false, stopped: false, reason: "page-reload-disabled" };
   }
 
-  if (normalizedMode === "element" && !runtimeSettings.enableDeepReloadElement) {
-    return { started: false, stopped: false, reason: "element-reload-disabled" };
-  }
-
-  const nextElementTarget = normalizedMode === "element"
-    ? resolveNearestRefreshRoot(resolveCurrentSelectedElement())
-    : null;
-
   // Selecting a new automatic mode/target always replaces the previous one.
   if (automaticReloadMode) {
     stopAutomaticReload();
   }
 
-  if (normalizedMode === "element") {
-    if (!nextElementTarget || !nextElementTarget.isConnected || isPageSurfaceElement(nextElementTarget)) {
-      return { started: false, stopped: false, reason: "no-element-under-cursor" };
-    }
-    automaticReloadElementLocator = createElementLocator(nextElementTarget);
-    if (!automaticReloadElementLocator) {
-      return { started: false, stopped: false, reason: "element-locator-unavailable" };
-    }
-    clearSelectedElementLocator();
-    if (runtimeSettings.enableElementHighlight) {
-      highlightElement(nextElementTarget);
-    }
-  } else {
-    clearSelectedElement();
-  }
+  clearSelectedElement();
 
   const normalizedIntervalSec = clampAutoReloadIntervalSec(Math.round(Number(intervalMs) / 1000));
-  startAutomaticReload(normalizedMode, normalizedIntervalSec * 1000);
-  showDebugReport({
+  startAutomaticReload(normalizedIntervalSec * 1000);
+  showNotification({
     mode: "Automatic",
-    note: `Started (${normalizedMode === "page" ? "Whole Page" : "Element Under Cursor"}) every ${normalizedIntervalSec}s`
+    note: `Started (Whole Page) every ${normalizedIntervalSec}s`
   });
 
   return {
     started: true,
     stopped: false,
-    mode: normalizedMode,
+    mode: "page",
     intervalMs: normalizedIntervalSec * 1000
   };
 }
@@ -873,9 +926,9 @@ function resetAutomaticReload() {
   stopAutomaticReload();
   clearSelectedElement();
 
-  showDebugReport({
+  showNotification({
     mode: "Automatic",
-    note: "Reset"
+    note: "Stopped"
   });
 
   return { reset: true };
@@ -888,7 +941,7 @@ function ensureReloadIndicatorElement() {
 
   const indicator = document.createElement('div');
   indicator.style.position = 'fixed';
-  indicator.style.top = '14px';
+  indicator.style.top = '84px';
   indicator.style.right = '14px';
   indicator.style.zIndex = '2147483647';
   indicator.style.padding = '6px 10px';
@@ -967,7 +1020,7 @@ function ensureDebugReportElement() {
 
   const panel = document.createElement("div");
   panel.style.position = "fixed";
-  panel.style.top = "14px";
+  panel.style.top = "84px";
   panel.style.right = "14px";
   panel.style.zIndex = "2147483647";
   panel.style.maxWidth = "320px";
@@ -992,7 +1045,7 @@ function ensureDebugReportElement() {
   return panel;
 }
 
-function showDebugReport(report) {
+function showNotification(report) {
   if (!report || !runtimeSettings.enableToastNotification) return;
 
   if (debugReportHideTimer) {
@@ -1001,7 +1054,7 @@ function showDebugReport(report) {
   debugReportFadeTimer = clearManagedTimeout(debugReportFadeTimer);
 
   const panel = ensureDebugReportElement();
-  const lines = ["Reload Report"];
+  const lines = ["Deep Reload"];
 
   if (report.mode) lines.push(`Mode: ${report.mode}`);
   if (typeof report.mediaReloaded === "number") lines.push(`Media reloaded: ${report.mediaReloaded}`);
@@ -1030,7 +1083,15 @@ function savePendingPageReport(report) {
   try {
     sessionStorage.setItem(PENDING_REPORT_STORAGE_KEY, JSON.stringify(report));
   } catch (error) {
-    console.warn("WholePage: Failed to persist pending report", error);
+    console.warn("Deep Reload: Failed to persist pending report", error);
+  }
+}
+
+function clearPendingPageReport() {
+  try {
+    sessionStorage.removeItem(PENDING_REPORT_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Deep Reload: Failed to clear pending report", error);
   }
 }
 
@@ -1047,10 +1108,10 @@ function consumePendingPageReport() {
     }
 
     if (runtimeSettings.enableToastNotification) {
-      showDebugReport(report);
+      showNotification(report);
     }
   } catch (error) {
-    console.warn("WholePage: Failed to read pending report", error);
+    console.warn("Deep Reload: Failed to read pending report", error);
   }
 }
 
@@ -1124,15 +1185,6 @@ function handleDocumentContextMenu(e) {
   }
 
   const eventTargetElement = resolveEventElementTarget(e);
-
-  // Preserve the active automatic element target while running.
-  if (automaticReloadMode === "element" && automaticReloadElementLocator) {
-    const automaticTargetElement = resolveElementLocator(automaticReloadElementLocator);
-    if (runtimeSettings.enableElementHighlight) {
-      highlightElement(automaticTargetElement);
-    }
-    return;
-  }
 
   if (automaticReloadMode === "page") {
     removeHighlight();
@@ -1379,12 +1431,12 @@ async function prepareWholePageReload(reportContext = null) {
           const removed = await registration.unregister();
           if (removed) result.serviceWorkersUnregistered++;
         } catch (error) {
-          console.warn("WholePage: Failed to unregister Service Worker", error);
+          console.warn("Deep Reload: Failed to unregister Service Worker", error);
         }
       }
     }
   } catch (error) {
-    console.warn("WholePage: Service Worker cleanup failed", error);
+    console.warn("Deep Reload: Service Worker cleanup failed", error);
   }
 
   try {
@@ -1395,12 +1447,12 @@ async function prepareWholePageReload(reportContext = null) {
           const removed = await caches.delete(key);
           if (removed) result.cacheStoresCleared++;
         } catch (error) {
-          console.warn("WholePage: Failed to clear cache store", key, error);
+          console.warn("Deep Reload: Failed to clear cache store", key, error);
         }
       }
     }
   } catch (error) {
-    console.warn("WholePage: Cache API cleanup failed", error);
+    console.warn("Deep Reload: Cache API cleanup failed", error);
   }
 
   const normalizedReportContext = normalizeReportContext(reportContext);
@@ -1415,8 +1467,12 @@ async function prepareWholePageReload(reportContext = null) {
     report.note = normalizedReportContext.note;
   }
 
-  savePendingPageReport(report);
-  showDebugReport(report);
+  if (normalizedReportContext?.suppressReport === true) {
+    clearPendingPageReport();
+  } else {
+    savePendingPageReport(report);
+    showNotification(report);
+  }
 
   return result;
 }
@@ -1509,11 +1565,16 @@ function disposeContentRuntime() {
   debugReportHideTimer = clearManagedTimeout(debugReportHideTimer);
   debugReportFadeTimer = clearManagedTimeout(debugReportFadeTimer);
   clearAllManagedTimeouts();
+  clearAutomaticReloadCountdownTimer();
   stopHighlightTracking();
   clearHighlightOverlayRoot();
+  hideAutomaticReloadBanner();
 
   if (highlightOverlayRoot?.parentNode) {
     highlightOverlayRoot.parentNode.removeChild(highlightOverlayRoot);
+  }
+  if (automaticReloadBannerElement?.parentNode) {
+    automaticReloadBannerElement.parentNode.removeChild(automaticReloadBannerElement);
   }
   if (reloadIndicatorElement?.parentNode) {
     reloadIndicatorElement.parentNode.removeChild(reloadIndicatorElement);
@@ -1523,6 +1584,7 @@ function disposeContentRuntime() {
   }
 
   highlightOverlayRoot = null;
+  automaticReloadBannerElement = null;
   reloadIndicatorElement = null;
   debugReportElement = null;
   activeIndicatorSessionId = 0;
@@ -1532,7 +1594,7 @@ function disposeContentRuntime() {
     try {
       removeListener();
     } catch (error) {
-      console.warn("WholePage: Failed while disposing content listener", error);
+      console.warn("Deep Reload: Failed while disposing content listener", error);
     }
   });
 
@@ -1727,7 +1789,6 @@ async function reloadElementUnderCursor(element, options = {}) {
   }
 
   const automatic = options.automatic === true;
-  const preserveAutomaticElementLocator = automatic && automaticReloadMode === "element";
   const clickedElement = resolveElementTarget(element);
   const targetElement = resolveNearestRefreshRoot(clickedElement);
   const targetResolvedUpward =
@@ -1739,7 +1800,7 @@ async function reloadElementUnderCursor(element, options = {}) {
     : null;
 
   if (!runtimeSettings.enableDeepReloadElement) {
-    cleanupTransientReferences({ preserveAutomaticElementLocator });
+    cleanupTransientReferences();
     return {
       handled: false,
       fallbackToPageReload: false,
@@ -1749,7 +1810,7 @@ async function reloadElementUnderCursor(element, options = {}) {
 
   if (!targetElement) {
     console.log("WholePage: No element found");
-    cleanupTransientReferences({ preserveAutomaticElementLocator });
+    cleanupTransientReferences();
     return {
       handled: false,
       fallbackToPageReload: true,
@@ -1758,7 +1819,7 @@ async function reloadElementUnderCursor(element, options = {}) {
   }
 
   if (!targetElement.isConnected) {
-    cleanupTransientReferences({ preserveAutomaticElementLocator });
+    cleanupTransientReferences();
     return {
       handled: false,
       fallbackToPageReload: true,
@@ -1767,7 +1828,7 @@ async function reloadElementUnderCursor(element, options = {}) {
   }
 
   if (isPageSurfaceElement(targetElement)) {
-    cleanupTransientReferences({ preserveAutomaticElementLocator });
+    cleanupTransientReferences();
     return {
       handled: false,
       fallbackToPageReload: true,
@@ -1790,7 +1851,7 @@ async function reloadElementUnderCursor(element, options = {}) {
       if (automatic) {
         blinkElement(targetElement);
       }
-      showDebugReport({
+      showNotification({
         mode: "Element Under Cursor",
         mediaReloaded: 1,
         inlineStylesUpdated: 0,
@@ -1827,7 +1888,7 @@ async function reloadElementUnderCursor(element, options = {}) {
 
     if (!handledAnyReload) {
       if (!automatic) {
-        showDebugReport({
+        showNotification({
           mode: "Element Under Cursor",
           mediaReloaded: 0,
           inlineStylesUpdated: 0,
@@ -1851,7 +1912,7 @@ async function reloadElementUnderCursor(element, options = {}) {
     if (automatic) {
       blinkElement(targetElement);
     }
-    showDebugReport({
+    showNotification({
       mode: "Element Under Cursor",
       mediaReloaded: reloadedMediaCount,
       inlineStylesUpdated: updatedInlineStyleCount,
@@ -1867,8 +1928,6 @@ async function reloadElementUnderCursor(element, options = {}) {
     };
   } finally {
     hideReloadIndicatorIfCurrent(reloadSessionId);
-    cleanupTransientReferences({
-      preserveAutomaticElementLocator
-    });
+    cleanupTransientReferences();
   }
 }

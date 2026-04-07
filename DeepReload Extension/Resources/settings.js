@@ -31,7 +31,7 @@ if (existingSettingsRuntime && typeof existingSettingsRuntime.cleanup === "funct
   try {
     existingSettingsRuntime.cleanup();
   } catch (error) {
-    console.warn("WholePage: Failed to clean up previous settings runtime", error);
+    console.warn("Deep Reload: Failed to clean up previous settings runtime", error);
   }
 }
 
@@ -75,7 +75,7 @@ function addExtensionListener(eventSource, handler) {
         eventSource.removeListener(handler);
       }
     } catch (error) {
-      console.warn("WholePage: Failed to remove settings listener", error);
+      console.warn("Deep Reload: Failed to remove settings listener", error);
     }
   });
 }
@@ -336,7 +336,7 @@ function disposeSettingsRuntime() {
     try {
       removeListener();
     } catch (error) {
-      console.warn("WholePage: Failed while disposing settings listener", error);
+      console.warn("Deep Reload: Failed while disposing settings listener", error);
     }
   });
 

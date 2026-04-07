@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Whole Page Settings</title>
+  <title>Deep Reload Settings</title>
   <link rel="stylesheet" href="settings.css">
   <script type="module" src="settings.js"></script>
 </head>
 <body>
   <main class="panel">
     <header class="panel-header">
-      <h1>Whole Page Settings</h1>
+      <h1>Deep Reload Settings</h1>
     </header>
 
     <section class="section">
@@ -40,8 +40,8 @@
 
       <label class="setting-row" for="enable-auto-reload-fallback">
         <span class="setting-copy">
-          <span class="setting-title">Auto reload fallback</span>
-          <span class="setting-subtitle">Automatically reload the whole page when element reload is not applicable.</span>
+          <span class="setting-title">Automatic whole-page refresh</span>
+          <span class="setting-subtitle">Allow scheduled deep refresh for the whole page only.</span>
         </span>
         <span class="switch-wrap">
           <input id="enable-auto-reload-fallback" type="checkbox">
@@ -52,7 +52,7 @@
       <label class="input-row" for="auto-reload-interval-sec">
         <span class="setting-copy">
           <span class="setting-title">Automatic reload interval (sec)</span>
-          <span class="setting-subtitle">Used by Automatic submenu actions.</span>
+          <span class="setting-subtitle">Used by the Automatic Whole Page menu action and countdown banner.</span>
         </span>
         <input id="auto-reload-interval-sec" type="number" min="5" max="3600" step="1">
       </label>

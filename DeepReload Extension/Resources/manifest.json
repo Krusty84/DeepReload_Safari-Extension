@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "default_locale": "en",
-  "name": "Whole Page",
+  "name": "Deep Reload",
   "version": "1.2.0",
   "description": "Right-click to reload the whole page or the element under cursor (bypassing cache).",
   "icons": {
@@ -16,7 +16,7 @@
       "type": "module"
   },
   "action": {
-    "default_title": "Whole Page Settings",
+    "default_title": "Deep Reload Settings",
     "default_popup": "settings.html",
     "default_icon": {
       "48": "images/icon-48.png",
