@@ -14,7 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         SFSafariApplication.showPreferencesForExtension(withIdentifier: "com.krusty84.DeepReload.Extension") { error in
             if let error = error {
-                print("Ошибка открытия настроек расширения: \(error.localizedDescription)")
+                print("Error opening extension settings: \(error.localizedDescription)")
             }
         }
     }

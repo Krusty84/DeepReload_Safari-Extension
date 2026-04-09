@@ -145,7 +145,7 @@ h2 {
   outline-offset: 2px;
 }
 
-#toast-duration-ms,
+#toast-duration-sec,
 #auto-reload-interval-sec {
   width: 96px;
   border: 1px solid var(--line);
@@ -157,14 +157,14 @@ h2 {
   background: #f8fbff;
 }
 
-#toast-duration-ms:focus-visible,
+#toast-duration-sec:focus-visible,
 #auto-reload-interval-sec:focus-visible {
   border-color: var(--accent);
   outline: 2px solid var(--accent-soft);
   outline-offset: 1px;
 }
 
-#toast-duration-ms:disabled,
+#toast-duration-sec:disabled,
 #auto-reload-interval-sec:disabled {
   opacity: 0.45;
 }
