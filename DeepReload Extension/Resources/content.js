@@ -5,6 +5,14 @@
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
 
+const {
+  DEFAULT_SETTINGS,
+  clampAutoReloadIntervalSec,
+  normalizeHighlightColor,
+  readSettings: readSharedSettings,
+  sanitizeSettings
+} = globalThis.__deepreload_settings_schema__;
+
 let lastSelectedElementLocator = null;
 let currentHighlightedElement = null;
 let activeReloadSessionId = 0;
@@ -50,16 +58,11 @@ const PENDING_REPORT_STORAGE_KEY = "__deepreload_pending_report__";
 const AUTO_RELOAD_STATE_STORAGE_KEY = "__deepreload_auto_reload_state__";
 const AUTO_PAGE_BLINK_STORAGE_KEY = "__deepreload_auto_page_blink__";
 const PENDING_REPORT_MAX_AGE_MS = 20000;
-const TOAST_DURATION_MIN_SEC = 1;
-const TOAST_DURATION_MAX_SEC = 15;
-const AUTO_RELOAD_INTERVAL_MIN_SEC = 5;
-const AUTO_RELOAD_INTERVAL_MAX_SEC = 3600;
 const AUTO_PAGE_BLINK_MAX_AGE_MS = 20000;
 const AUTOMATIC_RELOAD_BANNER_UPDATE_MS = 1000;
 const HIGHLIGHT_BORDER_WIDTH_PX = 3;
 const HIGHLIGHT_OVERLAY_PADDING_PX = 2;
 const HIGHLIGHT_MAX_RECT_COUNT = 24;
-const LEGACY_TOAST_DURATION_MS_KEY = "toastDurationMs";
 const URL_STYLE_PROPERTIES = [
   "backgroundImage",
   "borderImageSource",
@@ -67,16 +70,6 @@ const URL_STYLE_PROPERTIES = [
   "maskImage",
   "webkitMaskImage"
 ];
-const DEFAULT_SETTINGS = {
-  enableDeepReloadPage: true,
-  enableDeepReloadElement: true,
-  enableAutoReloadFallback: false,
-  autoReloadIntervalSec: 30,
-  enableElementHighlight: true,
-  enableToastNotification: true,
-  toastDurationSec: 5.5,
-  highlightColor: "#ff00ff"
-};
 
 let runtimeSettings = { ...DEFAULT_SETTINGS };
 
@@ -151,63 +144,12 @@ function normalizeReportContext(value) {
   return Object.keys(normalized).length > 0 ? normalized : null;
 }
 
-function clampToastDurationSec(value) {
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.toastDurationSec;
-  return Math.min(TOAST_DURATION_MAX_SEC, Math.max(TOAST_DURATION_MIN_SEC, parsed));
-}
-
-function normalizeToastDurationSec(rawSettings) {
-  if (rawSettings.toastDurationSec !== undefined) {
-    return clampToastDurationSec(rawSettings.toastDurationSec);
-  }
-
-  if (rawSettings[LEGACY_TOAST_DURATION_MS_KEY] !== undefined) {
-    return clampToastDurationSec(Number(rawSettings[LEGACY_TOAST_DURATION_MS_KEY]) / 1000);
-  }
-
-  return DEFAULT_SETTINGS.toastDurationSec;
-}
-
-function clampAutoReloadIntervalSec(value) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.autoReloadIntervalSec;
-  return Math.min(AUTO_RELOAD_INTERVAL_MAX_SEC, Math.max(AUTO_RELOAD_INTERVAL_MIN_SEC, parsed));
-}
-
-function normalizeHighlightColor(value) {
-  if (typeof value !== "string") return DEFAULT_SETTINGS.highlightColor;
-
-  const trimmed = value.trim().toLowerCase();
-  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(trimmed);
-  if (!match) return DEFAULT_SETTINGS.highlightColor;
-
-  if (trimmed.length === 4) {
-    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
-  }
-
-  return trimmed;
-}
-
 function hexToRgb(hexColor) {
   const normalized = normalizeHighlightColor(hexColor).slice(1);
   return {
     r: Number.parseInt(normalized.slice(0, 2), 16),
     g: Number.parseInt(normalized.slice(2, 4), 16),
     b: Number.parseInt(normalized.slice(4, 6), 16)
-  };
-}
-
-function sanitizeSettings(rawSettings) {
-  return {
-    enableDeepReloadPage: rawSettings.enableDeepReloadPage !== false,
-    enableDeepReloadElement: rawSettings.enableDeepReloadElement !== false,
-    enableAutoReloadFallback: rawSettings.enableAutoReloadFallback === true,
-    autoReloadIntervalSec: clampAutoReloadIntervalSec(rawSettings.autoReloadIntervalSec),
-    enableElementHighlight: rawSettings.enableElementHighlight !== false,
-    enableToastNotification: rawSettings.enableToastNotification !== false,
-    toastDurationSec: normalizeToastDurationSec(rawSettings),
-    highlightColor: normalizeHighlightColor(rawSettings.highlightColor)
   };
 }
 
@@ -267,10 +209,7 @@ function applyRuntimeSettingsPatch(patch) {
 
 async function loadSettingsFromStorage() {
   try {
-    const stored = await browser.storage.local.get([
-      ...Object.keys(DEFAULT_SETTINGS),
-      LEGACY_TOAST_DURATION_MS_KEY
-    ]);
+    const stored = await readSharedSettings();
     if (!isRuntimeActive()) return;
     applyRuntimeSettingsPatch(stored);
   } catch (error) {

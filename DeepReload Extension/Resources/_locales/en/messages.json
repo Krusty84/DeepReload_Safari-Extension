@@ -1,10 +1,14 @@
 {
-    "extension_name": {
-        "message": "Deep Reload Extension",
-        "description": "The display name for the extension."
-    },
-    "extension_description": {
-        "message": "This is Deep Reload Extension. You should tell us what your extension does here.",
-        "description": "Description of what the extension does."
-    }
+  "extension_name": {
+    "message": "Deep Reload",
+    "description": "The display name for the extension."
+  },
+  "extension_description": {
+    "message": "Right-click to reload the whole page or the element under cursor, bypassing cache.",
+    "description": "Short description shown in the browser UI."
+  },
+  "action_settings_title": {
+    "message": "Deep Reload Settings",
+    "description": "Tooltip shown for the toolbar action."
+  }
 }

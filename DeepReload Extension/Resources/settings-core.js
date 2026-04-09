@@ -5,21 +5,26 @@
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
 
-const TOAST_DURATION_MIN_SEC = 1;
-const TOAST_DURATION_MAX_SEC = 15;
-const AUTO_RELOAD_INTERVAL_MIN_SEC = 5;
-const AUTO_RELOAD_INTERVAL_MAX_SEC = 3600;
-const LEGACY_TOAST_DURATION_MS_KEY = "toastDurationMs";
+import "./settings-schema.js";
 
-export const DEFAULT_SETTINGS = {
-  enableDeepReloadPage: true,
-  enableDeepReloadElement: true,
-  enableAutoReloadFallback: false,
-  autoReloadIntervalSec: 30,
-  enableElementHighlight: true,
-  enableToastNotification: true,
-  toastDurationSec: 5.5,
-  highlightColor: "#ff00ff"
+const {
+  DEFAULT_SETTINGS,
+  clampAutoReloadIntervalSec,
+  clampToastDurationSec,
+  normalizeHighlightColor,
+  readSettings,
+  sanitizeSettings,
+  saveSettings
+} = globalThis.__deepreload_settings_schema__;
+
+export {
+  DEFAULT_SETTINGS,
+  clampAutoReloadIntervalSec,
+  clampToastDurationSec,
+  normalizeHighlightColor,
+  readSettings,
+  sanitizeSettings,
+  saveSettings
 };
 
 export let currentSettings = { ...DEFAULT_SETTINGS };
@@ -66,78 +71,12 @@ export function addExtensionListener(eventSource, handler) {
   });
 }
 
-export function clampToastDurationSec(value) {
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.toastDurationSec;
-  return Math.min(TOAST_DURATION_MAX_SEC, Math.max(TOAST_DURATION_MIN_SEC, parsed));
-}
-
-function normalizeToastDurationSec(rawSettings) {
-  if (rawSettings.toastDurationSec !== undefined) {
-    return clampToastDurationSec(rawSettings.toastDurationSec);
-  }
-
-  if (rawSettings[LEGACY_TOAST_DURATION_MS_KEY] !== undefined) {
-    return clampToastDurationSec(Number(rawSettings[LEGACY_TOAST_DURATION_MS_KEY]) / 1000);
-  }
-
-  return DEFAULT_SETTINGS.toastDurationSec;
-}
-
-export function clampAutoReloadIntervalSec(value) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return DEFAULT_SETTINGS.autoReloadIntervalSec;
-  return Math.min(AUTO_RELOAD_INTERVAL_MAX_SEC, Math.max(AUTO_RELOAD_INTERVAL_MIN_SEC, parsed));
-}
-
-export function normalizeHighlightColor(value) {
-  if (typeof value !== "string") return DEFAULT_SETTINGS.highlightColor;
-
-  const trimmed = value.trim().toLowerCase();
-  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(trimmed);
-  if (!match) return DEFAULT_SETTINGS.highlightColor;
-
-  if (trimmed.length === 4) {
-    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`;
-  }
-
-  return trimmed;
-}
-
-export function sanitizeSettings(rawSettings) {
-  return {
-    enableDeepReloadPage: rawSettings.enableDeepReloadPage !== false,
-    enableDeepReloadElement: rawSettings.enableDeepReloadElement !== false,
-    enableAutoReloadFallback: rawSettings.enableAutoReloadFallback === true,
-    autoReloadIntervalSec: clampAutoReloadIntervalSec(rawSettings.autoReloadIntervalSec),
-    enableElementHighlight: rawSettings.enableElementHighlight !== false,
-    enableToastNotification: rawSettings.enableToastNotification !== false,
-    toastDurationSec: normalizeToastDurationSec(rawSettings),
-    highlightColor: normalizeHighlightColor(rawSettings.highlightColor)
-  };
-}
-
 export function setCurrentSettings(nextSettings) {
   currentSettings = sanitizeSettings(nextSettings);
   return currentSettings;
 }
 
-export async function readSettings() {
-  const stored = await browser.storage.local.get([
-    ...Object.keys(DEFAULT_SETTINGS),
-    LEGACY_TOAST_DURATION_MS_KEY
-  ]);
-  return sanitizeSettings(stored);
-}
-
-export async function saveSettings(partialSettings) {
-  const mergedSettings = sanitizeSettings({
-    ...currentSettings,
-    ...partialSettings
-  });
-
-  await browser.storage.local.set(mergedSettings);
-  await browser.storage.local.remove(LEGACY_TOAST_DURATION_MS_KEY);
-  currentSettings = mergedSettings;
+export async function persistSettings(partialSettings) {
+  currentSettings = await saveSettings(partialSettings, currentSettings);
   return currentSettings;
 }

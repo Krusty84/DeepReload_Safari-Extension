@@ -13,8 +13,7 @@ import {
   clampToastDurationSec,
   currentSettings,
   normalizeHighlightColor,
-  sanitizeSettings,
-  saveSettings,
+  persistSettings,
   setCurrentSettings
 } from "./settings-core.js";
 
@@ -86,7 +85,7 @@ export function renderControls() {
 
 async function persistCheckboxSetting(key, control) {
   try {
-    await saveSettings({ [key]: control.checked });
+    await persistSettings({ [key]: control.checked });
     renderControls();
     showStatus("Saved");
   } catch (error) {
@@ -100,7 +99,7 @@ async function persistNumericSetting(key, control, clampValue, fallbackValue) {
   try {
     const nextValue = clampValue(control.value);
     control.value = String(nextValue);
-    await saveSettings({ [key]: nextValue });
+    await persistSettings({ [key]: nextValue });
     renderControls();
     showStatus("Saved");
   } catch (error) {
@@ -170,7 +169,7 @@ export function installListeners() {
     try {
       const nextColor = normalizeHighlightColor(controls.highlightColor.value);
       controls.highlightColor.value = nextColor;
-      await saveSettings({ highlightColor: nextColor });
+      await persistSettings({ highlightColor: nextColor });
       renderControls();
       showStatus("Saved");
     } catch (error) {
@@ -192,7 +191,7 @@ export function installListeners() {
       nextRawSettings[key] = changes[key].newValue;
     }
 
-    setCurrentSettings(sanitizeSettings(nextRawSettings));
+    setCurrentSettings(nextRawSettings);
     renderControls();
   });
 }
