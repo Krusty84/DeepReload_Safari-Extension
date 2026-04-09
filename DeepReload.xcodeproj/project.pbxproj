@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3D9327C12F7717EC0056F878 /* DeepReload Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3D9327C02F7717EC0056F878 /* DeepReload Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3DCE01712F883C7E00AD415D /* ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 3DCE01702F883C7E00AD415D /* ARCHITECTURE.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,6 +38,7 @@
 /* Begin PBXFileReference section */
 		3D9327A32F7717EB0056F878 /* DeepReload.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepReload.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3D9327C02F7717EC0056F878 /* DeepReload Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "DeepReload Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3DCE01702F883C7E00AD415D /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -103,6 +105,7 @@
 				3D9327A52F7717EB0056F878 /* DeepReload */,
 				3D9327C42F7717EC0056F878 /* DeepReload Extension */,
 				3D9327A42F7717EB0056F878 /* Products */,
+				3DCE01702F883C7E00AD415D /* ARCHITECTURE.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -214,6 +217,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3DCE01712F883C7E00AD415D /* ARCHITECTURE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -5,13 +5,25 @@
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
 
-const {
-  DEFAULT_SETTINGS,
-  clampAutoReloadIntervalSec,
-  normalizeHighlightColor,
-  readSettings: readSharedSettings,
-  sanitizeSettings
-} = globalThis.__deepreload_settings_schema__;
+const sharedSettingsSchema = globalThis.__deepreload_settings_schema__;
+
+var DEFAULT_SETTINGS = sharedSettingsSchema.DEFAULT_SETTINGS;
+
+function clampAutoReloadIntervalSec(value) {
+  return sharedSettingsSchema.clampAutoReloadIntervalSec(value);
+}
+
+function normalizeHighlightColor(value) {
+  return sharedSettingsSchema.normalizeHighlightColor(value);
+}
+
+function sanitizeSettings(rawSettings) {
+  return sharedSettingsSchema.sanitizeSettings(rawSettings);
+}
+
+async function readSharedSettings() {
+  return sharedSettingsSchema.readSettings();
+}
 
 let lastSelectedElementLocator = null;
 let currentHighlightedElement = null;
