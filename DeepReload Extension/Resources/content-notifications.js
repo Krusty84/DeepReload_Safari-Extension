@@ -1,6 +1,7 @@
 //
 //  content-notifications.js
 //  DeepReload Extension
+//  Renders reload indicators, result toasts, and pending page reports.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //

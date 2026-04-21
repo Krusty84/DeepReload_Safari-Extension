@@ -1,6 +1,7 @@
 //
 //  background.js
 //  DeepReload Extension
+//  Boots the background runtime and registers extension event listeners.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //

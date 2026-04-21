@@ -1,6 +1,7 @@
 //
 //  settings-schema.js
 //  DeepReload Extension
+//  Defines shared settings defaults, validation, migration, and storage helpers.
 //
 //  Created by Sedoykin Alexey on 09/04/2026.
 //
@@ -13,13 +14,20 @@ if (!globalThis[DEEPRELOAD_SETTINGS_SCHEMA_KEY]) {
   const AUTO_RELOAD_INTERVAL_MIN_SEC = 5;
   const AUTO_RELOAD_INTERVAL_MAX_SEC = 3600;
   const LEGACY_TOAST_DURATION_MS_KEY = "toastDurationMs";
+  const LEGACY_ENABLE_ELEMENT_HIGHLIGHT_KEY = "enableElementHighlight";
+  // Selection visual modes: full modes act on right-click selection; half modes act only after the menu command starts.
+  const ELEMENT_SELECTION_STYLE_NONE = "none";
+  const ELEMENT_SELECTION_STYLE_BLINK = "blink";
+  const ELEMENT_SELECTION_STYLE_HALF_BLINK = "half-blink";
+  const ELEMENT_SELECTION_STYLE_PERSISTENT = "persistent";
+  const ELEMENT_SELECTION_STYLE_HALF_PERSISTENT = "half-persistent";
 
   const DEFAULT_SETTINGS = {
     enableDeepReloadPage: true,
     enableDeepReloadElement: true,
     enableAutoReloadFallback: false,
     autoReloadIntervalSec: 30,
-    enableElementHighlight: true,
+    elementSelectionStyle: ELEMENT_SELECTION_STYLE_PERSISTENT,
     enableToastNotification: true,
     toastDurationSec: 5.5,
     highlightColor: "#ff00ff"
@@ -27,7 +35,8 @@ if (!globalThis[DEEPRELOAD_SETTINGS_SCHEMA_KEY]) {
 
   const STORAGE_KEYS = [
     ...Object.keys(DEFAULT_SETTINGS),
-    LEGACY_TOAST_DURATION_MS_KEY
+    LEGACY_TOAST_DURATION_MS_KEY,
+    LEGACY_ENABLE_ELEMENT_HIGHLIGHT_KEY
   ];
 
   function clampToastDurationSec(value) {
@@ -68,6 +77,28 @@ if (!globalThis[DEEPRELOAD_SETTINGS_SCHEMA_KEY]) {
     return trimmed;
   }
 
+  function normalizeElementSelectionStyle(value, rawSettings = null) {
+    if (
+      value === ELEMENT_SELECTION_STYLE_NONE ||
+      value === ELEMENT_SELECTION_STYLE_BLINK ||
+      value === ELEMENT_SELECTION_STYLE_HALF_BLINK ||
+      value === ELEMENT_SELECTION_STYLE_PERSISTENT ||
+      value === ELEMENT_SELECTION_STYLE_HALF_PERSISTENT
+    ) {
+      return value;
+    }
+
+    const source = rawSettings && typeof rawSettings === "object" ? rawSettings : null;
+    if (source && source[LEGACY_ENABLE_ELEMENT_HIGHLIGHT_KEY] !== undefined) {
+      // Migrate the old boolean highlight setting to the nearest current mode.
+      return source[LEGACY_ENABLE_ELEMENT_HIGHLIGHT_KEY] === false
+        ? ELEMENT_SELECTION_STYLE_NONE
+        : ELEMENT_SELECTION_STYLE_PERSISTENT;
+    }
+
+    return DEFAULT_SETTINGS.elementSelectionStyle;
+  }
+
   function sanitizeSettings(rawSettings) {
     const source = rawSettings && typeof rawSettings === "object" ? rawSettings : {};
     return {
@@ -75,7 +106,7 @@ if (!globalThis[DEEPRELOAD_SETTINGS_SCHEMA_KEY]) {
       enableDeepReloadElement: source.enableDeepReloadElement !== false,
       enableAutoReloadFallback: source.enableAutoReloadFallback === true,
       autoReloadIntervalSec: clampAutoReloadIntervalSec(source.autoReloadIntervalSec),
-      enableElementHighlight: source.enableElementHighlight !== false,
+      elementSelectionStyle: normalizeElementSelectionStyle(source.elementSelectionStyle, source),
       enableToastNotification: source.enableToastNotification !== false,
       toastDurationSec: normalizeToastDurationSec(source),
       highlightColor: normalizeHighlightColor(source.highlightColor)
@@ -95,15 +126,23 @@ if (!globalThis[DEEPRELOAD_SETTINGS_SCHEMA_KEY]) {
 
     await browser.storage.local.set(mergedSettings);
     await browser.storage.local.remove(LEGACY_TOAST_DURATION_MS_KEY);
+    await browser.storage.local.remove(LEGACY_ENABLE_ELEMENT_HIGHLIGHT_KEY);
     return mergedSettings;
   }
 
   globalThis[DEEPRELOAD_SETTINGS_SCHEMA_KEY] = Object.freeze({
     DEFAULT_SETTINGS: Object.freeze({ ...DEFAULT_SETTINGS }),
     LEGACY_TOAST_DURATION_MS_KEY,
+    LEGACY_ENABLE_ELEMENT_HIGHLIGHT_KEY,
+    ELEMENT_SELECTION_STYLE_NONE,
+    ELEMENT_SELECTION_STYLE_BLINK,
+    ELEMENT_SELECTION_STYLE_HALF_BLINK,
+    ELEMENT_SELECTION_STYLE_PERSISTENT,
+    ELEMENT_SELECTION_STYLE_HALF_PERSISTENT,
     STORAGE_KEYS: Object.freeze([...STORAGE_KEYS]),
     clampToastDurationSec,
     clampAutoReloadIntervalSec,
+    normalizeElementSelectionStyle,
     normalizeHighlightColor,
     sanitizeSettings,
     readSettings,

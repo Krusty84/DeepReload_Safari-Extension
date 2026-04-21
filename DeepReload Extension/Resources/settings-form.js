@@ -1,6 +1,7 @@
 //
 //  settings-form.js
 //  DeepReload Extension
+//  Renders settings controls and persists user changes.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
@@ -12,6 +13,7 @@ import {
   clampAutoReloadIntervalSec,
   clampToastDurationSec,
   currentSettings,
+  normalizeElementSelectionStyle,
   normalizeHighlightColor,
   persistSettings,
   setCurrentSettings
@@ -24,7 +26,7 @@ const controls = {
   enableDeepReloadElement: document.getElementById("enable-element-reload"),
   enableAutoReloadFallback: document.getElementById("enable-auto-reload-fallback"),
   autoReloadIntervalSec: document.getElementById("auto-reload-interval-sec"),
-  enableElementHighlight: document.getElementById("enable-element-highlight"),
+  elementSelectionStyle: document.getElementById("element-selection-style"),
   enableToastNotification: document.getElementById("enable-toast-notification"),
   toastDurationSec: document.getElementById("toast-duration-sec"),
   highlightColor: document.getElementById("highlight-color")
@@ -39,7 +41,7 @@ function hasAllControls() {
     controls.enableDeepReloadElement &&
     controls.enableAutoReloadFallback &&
     controls.autoReloadIntervalSec &&
-    controls.enableElementHighlight &&
+    controls.elementSelectionStyle &&
     controls.enableToastNotification &&
     controls.toastDurationSec &&
     controls.highlightColor
@@ -75,12 +77,16 @@ export function renderControls() {
   controls.enableAutoReloadFallback.checked = currentSettings.enableAutoReloadFallback;
   controls.autoReloadIntervalSec.value = String(currentSettings.autoReloadIntervalSec);
   controls.autoReloadIntervalSec.disabled = !currentSettings.enableAutoReloadFallback;
-  controls.enableElementHighlight.checked = currentSettings.enableElementHighlight;
+  controls.elementSelectionStyle.value = normalizeElementSelectionStyle(currentSettings.elementSelectionStyle);
+  // Element-specific visual controls are meaningful only when element reload is enabled.
+  controls.elementSelectionStyle.disabled = !currentSettings.enableDeepReloadElement;
   controls.enableToastNotification.checked = currentSettings.enableToastNotification;
   controls.toastDurationSec.value = String(currentSettings.toastDurationSec);
   controls.toastDurationSec.disabled = !currentSettings.enableToastNotification;
   controls.highlightColor.value = normalizeHighlightColor(currentSettings.highlightColor);
-  controls.highlightColor.disabled = !currentSettings.enableElementHighlight;
+  controls.highlightColor.disabled =
+    !currentSettings.enableDeepReloadElement ||
+    controls.elementSelectionStyle.value === "none";
 }
 
 async function persistCheckboxSetting(key, control) {
@@ -146,8 +152,17 @@ export function installListeners() {
     void persistCheckboxSetting("enableToastNotification", controls.enableToastNotification);
   });
 
-  addDomListener(controls.enableElementHighlight, "change", () => {
-    void persistCheckboxSetting("enableElementHighlight", controls.enableElementHighlight);
+  addDomListener(controls.elementSelectionStyle, "change", () => {
+    void persistSettings({
+      elementSelectionStyle: normalizeElementSelectionStyle(controls.elementSelectionStyle.value)
+    }).then(() => {
+      renderControls();
+      showStatus("Saved");
+    }).catch((error) => {
+      console.error("WholePage: Failed to save setting", error);
+      renderControls();
+      showStatus("Save failed", true);
+    });
   });
 
   const persistToastDuration = () => persistNumericSetting(

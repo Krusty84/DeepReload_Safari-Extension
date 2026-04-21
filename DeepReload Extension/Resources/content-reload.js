@@ -1,6 +1,7 @@
 //
 //  content-reload.js
 //  DeepReload Extension
+//  Handles reload messages and performs page or element resource refreshes.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
@@ -632,6 +633,32 @@ async function reloadElementUnderCursor(element, options = {}) {
   try {
     const timestamp = Date.now();
     let reloadedMediaCount = 0;
+    // Command-only visuals should match the selected element, not the larger resolved reload ancestor.
+    const preUpdateBlinkTarget =
+      clickedElement instanceof Element && clickedElement.isConnected
+        ? clickedElement
+        : targetElement;
+    const hasRefreshableTarget = hasRefreshableContent(targetElement);
+    const shouldBlinkBeforeUpdate =
+      !automatic &&
+      usesCommandBlinkElementSelectionVisuals() &&
+      hasRefreshableTarget;
+    const shouldHighlightDuringUpdate =
+      !automatic &&
+      usesCommandPersistentElementSelectionVisuals() &&
+      hasRefreshableTarget;
+
+    if (shouldBlinkBeforeUpdate) {
+      blinkElement(preUpdateBlinkTarget);
+      await waitForManagedDelay(ELEMENT_SELECTION_BLINK_LEAD_IN_MS);
+    }
+
+    if (shouldHighlightDuringUpdate) {
+      // The finally cleanup below removes this half-mode highlight when the reload flow completes.
+      clearSelectionVisual();
+      currentHighlightedElement = preUpdateBlinkTarget;
+      syncHighlightOverlay();
+    }
 
     const directReload = reloadMediaElement(targetElement, timestamp);
     if (directReload) {

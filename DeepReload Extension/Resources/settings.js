@@ -1,6 +1,7 @@
 //
 //  settings.js
 //  DeepReload Extension
+//  Boots the settings popup/options page and wires runtime cleanup.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //

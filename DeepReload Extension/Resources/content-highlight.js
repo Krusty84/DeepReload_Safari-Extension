@@ -1,6 +1,7 @@
 //
 //  content-highlight.js
 //  DeepReload Extension
+//  Tracks selected elements and renders highlight or blink visuals.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
@@ -220,7 +221,7 @@ function collectElementSubtree(rootElement) {
 }
 
 function renderHighlightOverlay(element) {
-  if (!(element instanceof Element) || !element.isConnected || !runtimeSettings.enableElementHighlight) {
+  if (!(element instanceof Element) || !element.isConnected || !canRenderPersistentElementSelectionVisuals()) {
     clearHighlightOverlayRoot();
     return;
   }
@@ -297,6 +298,12 @@ function queueHighlightOverlaySync() {
 }
 
 function syncHighlightOverlay() {
+  if (!canRenderPersistentElementSelectionVisuals()) {
+    clearHighlightOverlayRoot();
+    stopHighlightTracking();
+    return;
+  }
+
   if (!(currentHighlightedElement instanceof Element)) {
     clearHighlightOverlayRoot();
     stopHighlightTracking();
@@ -319,9 +326,13 @@ function syncHighlightOverlay() {
   queueHighlightOverlaySync();
 }
 
-function removeHighlight() {
+function clearSelectionVisual() {
   stopHighlightTracking();
   clearHighlightOverlayRoot();
+}
+
+function removeHighlight() {
+  clearSelectionVisual();
   currentHighlightedElement = null;
 }
 
@@ -408,15 +419,19 @@ function highlightElement(element) {
     removeHighlight();
     return;
   }
-  if (!runtimeSettings.enableElementHighlight) {
-    removeHighlight();
+
+  // Selection state is retained for command execution even when the selected visual mode is "none".
+  clearSelectionVisual();
+  currentHighlightedElement = resolvedElement;
+
+  if (usesPersistentElementSelectionVisuals()) {
+    syncHighlightOverlay();
     return;
   }
 
-  removeHighlight();
-
-  currentHighlightedElement = resolvedElement;
-  syncHighlightOverlay();
+  if (usesBlinkElementSelectionVisuals()) {
+    blinkElement(resolvedElement);
+  }
 }
 
 function shouldClearManualHighlightFromMouseEvent(event) {

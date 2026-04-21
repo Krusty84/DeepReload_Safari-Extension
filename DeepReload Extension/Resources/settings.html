@@ -28,21 +28,10 @@
         </span>
       </label>
 
-      <label class="setting-row" for="enable-element-reload">
-        <span class="setting-copy">
-          <span class="setting-title">Element Under Cursor</span>
-          <span class="setting-subtitle">Enable the element-level reload action for the current cursor target.</span>
-        </span>
-        <span class="switch-wrap">
-          <input id="enable-element-reload" type="checkbox">
-          <span class="switch" aria-hidden="true"></span>
-        </span>
-      </label>
-
       <label class="setting-row" for="enable-auto-reload-fallback">
         <span class="setting-copy">
-          <span class="setting-title">Automatic whole-page refresh</span>
-          <span class="setting-subtitle">Allow scheduled deep refresh for the whole page only.</span>
+          <span class="setting-title">Automatic whole-page reload</span>
+          <span class="setting-subtitle">Allow scheduled reload for the whole page only.</span>
         </span>
         <span class="switch-wrap">
           <input id="enable-auto-reload-fallback" type="checkbox">
@@ -58,15 +47,31 @@
         <input id="auto-reload-interval-sec" type="number" min="5" max="3600" step="1">
       </label>
 
-      <label class="setting-row" for="enable-element-highlight">
+      <div class="control-divider" role="separator" aria-hidden="true"></div>
+
+      <label class="setting-row" for="enable-element-reload">
         <span class="setting-copy">
-          <span class="setting-title">Highlight selected element</span>
-          <span class="setting-subtitle">Show visual outline/background on right-click target.</span>
+          <span class="setting-title">Element Under Cursor</span>
+          <span class="setting-subtitle">Enable the element-level reload action for the current cursor target.</span>
         </span>
         <span class="switch-wrap">
-          <input id="enable-element-highlight" type="checkbox">
+          <input id="enable-element-reload" type="checkbox">
           <span class="switch" aria-hidden="true"></span>
         </span>
+      </label>
+
+      <label class="input-row" for="element-selection-style">
+        <span class="setting-copy">
+          <span class="setting-title">Selected element visualization</span>
+          <span class="setting-subtitle">Choose how the selected element is shown after right-click and before element reload.</span>
+        </span>
+        <select id="element-selection-style">
+          <option value="none">None</option>
+          <option value="blink">Short blink</option>
+          <option value="half-blink">Short half-blink</option>
+          <option value="persistent">Persistent highlight</option>
+          <option value="half-persistent">Persistent half-highlight</option>
+        </select>
       </label>
 
       <label class="input-row" for="highlight-color">

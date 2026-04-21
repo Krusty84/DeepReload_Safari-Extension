@@ -1,12 +1,14 @@
 //
 //  content.js
 //  DeepReload Extension
+//  Initializes shared content-script state, settings, timers, and lifecycle.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
 
 const sharedSettingsSchema = globalThis.__deepreload_settings_schema__;
 
+// Keep these as top-level declarations: later content files rely on the shared content-script scope.
 var DEFAULT_SETTINGS = sharedSettingsSchema.DEFAULT_SETTINGS;
 
 function clampAutoReloadIntervalSec(value) {
@@ -72,6 +74,7 @@ const AUTO_PAGE_BLINK_STORAGE_KEY = "__deepreload_auto_page_blink__";
 const PENDING_REPORT_MAX_AGE_MS = 20000;
 const AUTO_PAGE_BLINK_MAX_AGE_MS = 20000;
 const AUTOMATIC_RELOAD_BANNER_UPDATE_MS = 1000;
+const ELEMENT_SELECTION_BLINK_LEAD_IN_MS = 130;
 const HIGHLIGHT_BORDER_WIDTH_PX = 3;
 const HIGHLIGHT_OVERLAY_PADDING_PX = 2;
 const HIGHLIGHT_MAX_RECT_COUNT = 24;
@@ -132,6 +135,12 @@ function clearAllManagedTimeouts() {
   managedTimeoutIds.clear();
 }
 
+function waitForManagedDelay(delay) {
+  return new Promise((resolve) => {
+    scheduleManagedTimeout(resolve, delay);
+  });
+}
+
 function isMessageObject(value) {
   return value !== null && typeof value === "object";
 }
@@ -163,6 +172,33 @@ function hexToRgb(hexColor) {
     g: Number.parseInt(normalized.slice(2, 4), 16),
     b: Number.parseInt(normalized.slice(4, 6), 16)
   };
+}
+
+// Full modes show feedback on right-click selection; command modes show feedback only while executing reload.
+function usesPersistentElementSelectionVisuals() {
+  return runtimeSettings.elementSelectionStyle === "persistent";
+}
+
+function usesBlinkElementSelectionVisuals() {
+  return runtimeSettings.elementSelectionStyle === "blink";
+}
+
+function canRenderPersistentElementSelectionVisuals() {
+  return (
+    runtimeSettings.elementSelectionStyle === "persistent" ||
+    runtimeSettings.elementSelectionStyle === "half-persistent"
+  );
+}
+
+function usesCommandBlinkElementSelectionVisuals() {
+  return (
+    runtimeSettings.elementSelectionStyle === "blink" ||
+    runtimeSettings.elementSelectionStyle === "half-blink"
+  );
+}
+
+function usesCommandPersistentElementSelectionVisuals() {
+  return runtimeSettings.elementSelectionStyle === "half-persistent";
 }
 
 function applyRuntimeSettingsPatch(patch) {
@@ -199,8 +235,8 @@ function applyRuntimeSettingsPatch(patch) {
     stopAutomaticReload();
   }
 
-  if (!runtimeSettings.enableElementHighlight) {
-    removeHighlight();
+  if (!usesPersistentElementSelectionVisuals()) {
+    clearSelectionVisual();
   }
 
   if (!runtimeSettings.enableAutoReloadFallback) {
@@ -214,7 +250,7 @@ function applyRuntimeSettingsPatch(patch) {
     hideAutomaticReloadBanner();
   }
 
-  if (runtimeSettings.enableDeepReloadElement && runtimeSettings.enableElementHighlight && currentHighlightedElement) {
+  if (runtimeSettings.enableDeepReloadElement && usesPersistentElementSelectionVisuals() && currentHighlightedElement) {
     syncHighlightOverlay();
   }
 }

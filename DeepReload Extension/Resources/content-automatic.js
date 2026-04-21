@@ -1,6 +1,7 @@
 //
 //  content-automatic.js
 //  DeepReload Extension
+//  Manages automatic whole-page reload state, countdown UI, and triggers.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //

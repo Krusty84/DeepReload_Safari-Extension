@@ -1,6 +1,7 @@
 //
 //  background-actions.js
 //  DeepReload Extension
+//  Performs tab-level reload, navigation, and content-script action dispatch.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //

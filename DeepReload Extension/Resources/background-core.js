@@ -1,6 +1,7 @@
 //
 //  background-core.js
 //  DeepReload Extension
+//  Provides background runtime state, constants, listeners, and settings access.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //

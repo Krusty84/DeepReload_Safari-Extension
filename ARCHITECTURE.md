@@ -2,7 +2,7 @@
 
 ## Overview
 
-`DeepReload Extension/` contains the browser extension payload for Deep Reload.
+`DeepReload Extension/Resources/` contains the browser extension payload for Deep Reload.
 
 The extension is split into three execution contexts:
 
@@ -55,7 +55,7 @@ Relevant files:
 The content layer owns all page-local behavior.
 
 - Tracks the element under the last context-menu click.
-- Draws the element highlight overlay.
+- Renders selected-element visuals according to the configured mode.
 - Performs element-level reload by cache-busting resource URLs on media and inline-style-backed assets.
 - Performs pre-navigation cleanup for whole-page reload by unregistering service workers and clearing Cache API stores.
 - Renders toasts, debug reports, and the automatic reload banner.
@@ -75,6 +75,8 @@ The settings layer edits persistent extension configuration stored in `browser.s
 
 - Reads normalized settings on load.
 - Renders toggles and numeric/color inputs.
+- Groups whole-page controls separately from element-under-cursor controls.
+- Disables element visualization controls when element reload is disabled.
 - Saves partial changes immediately.
 - Reacts to storage changes so popup/options state stays in sync.
 
@@ -95,6 +97,7 @@ It defines:
 - default values
 - validation/clamping
 - normalization
+- legacy setting migration
 - storage keys
 - read/save helpers
 
@@ -104,6 +107,27 @@ This file is shared in two different ways:
 - loaded as a plain script before content scripts, exposing helpers through `globalThis.__deepreload_settings_schema__`
 
 This dual-use shape exists because the content scripts are not modules.
+
+Current long-lived settings:
+
+- `enableDeepReloadPage`
+- `enableDeepReloadElement`
+- `enableAutoReloadFallback`
+- `autoReloadIntervalSec`
+- `elementSelectionStyle`
+- `enableToastNotification`
+- `toastDurationSec`
+- `highlightColor`
+
+`elementSelectionStyle` supports five modes:
+
+- `none`: no selected-element visual.
+- `blink`: blink on right-click selection and again when `Element Under Cursor` starts.
+- `half-blink`: no right-click blink; blink only after `Element Under Cursor` starts.
+- `persistent`: persistent highlight appears on right-click selection.
+- `half-persistent`: no right-click highlight; persistent highlight appears during the element reload flow and is cleared when the flow completes.
+
+The old boolean `enableElementHighlight` is still read as a legacy key and migrated to `none` or `persistent`.
 
 ## File Responsibilities
 
@@ -123,6 +147,7 @@ This dual-use shape exists because the content scripts are not modules.
 ### `background-menus.js`
 
 - Builds context menus based on settings.
+- Hides `Element Under Cursor` when element reload is disabled.
 - Serializes menu rebuilds through `contextMenuUpdatePromise`.
 - Routes menu clicks to reload actions.
 - Re-applies menus when relevant settings change.
@@ -147,6 +172,7 @@ This dual-use shape exists because the content scripts are not modules.
 - Base content runtime shell.
 - Owns shared mutable state used by the later content files.
 - Manages lifecycle, listener registration, timer cleanup, and settings hydration.
+- Defines selection-visual mode helpers used by later content files.
 
 Important: this file defines globals consumed by the later content files. Because the content scripts are plain scripts, top-level declarations and script order matter.
 
@@ -154,7 +180,9 @@ Important: this file defines globals consumed by the later content files. Becaus
 
 - Resolves the selected DOM target, including across shadow DOM boundaries.
 - Builds a locator for the selected element.
-- Draws and updates the highlight overlay.
+- Retains selected-element state even when the active visual mode shows no selection-time UI.
+- Draws and updates persistent highlight overlays.
+- Draws blink overlays for blink-based selection modes.
 - Clears or preserves highlight based on input events and automatic reload mode.
 
 ### `content-notifications.js`
@@ -175,6 +203,7 @@ Important: this file defines globals consumed by the later content files. Becaus
 - Handles extension messages from the background.
 - Implements whole-page pre-reload cleanup.
 - Implements element-level resource reload.
+- Renders command-time selected-element visuals before the update when the active mode requires it.
 - Rewrites URLs in:
   - `src`
   - `srcset`
@@ -194,6 +223,10 @@ Important: this file defines globals consumed by the later content files. Becaus
 
 - Finds form controls.
 - Renders UI from `currentSettings`.
+- Applies UI dependencies:
+  - automatic interval is disabled unless automatic reload is enabled
+  - selected-element visualization is disabled unless element reload is enabled
+  - highlight color is disabled when element reload is disabled or visualization is `none`
 - Persists changes immediately.
 - Reacts to storage updates.
 
@@ -215,11 +248,19 @@ Important: this file defines globals consumed by the later content files. Becaus
 
 ### Element Reload
 
+The `Element Under Cursor` menu item exists only when `enableDeepReloadElement` is enabled.
+
 1. User right-clicks an element.
-2. `content-highlight.js` records the selected element and renders highlight UI.
-3. User selects `Element Under Cursor` from the menu.
-4. `background-menus.js` routes to `handleElementUnderCursorReload`.
-5. `content-reload.js` reloads the nearest refreshable target and shows a result toast.
+2. `content-highlight.js` records the selected element.
+3. If the selected mode is `blink`, `content-highlight.js` blinks the selected element.
+4. If the selected mode is `persistent`, `content-highlight.js` renders a persistent overlay.
+5. User selects `Element Under Cursor` from the menu.
+6. `background-menus.js` routes to `handleElementUnderCursorReload`.
+7. `content-reload.js` resolves the nearest refreshable target.
+8. If the selected mode is `blink` or `half-blink`, `content-reload.js` blinks the originally selected element before updating.
+9. If the selected mode is `half-persistent`, `content-reload.js` shows a persistent overlay during the update flow.
+10. `content-reload.js` reloads the target and shows a result toast.
+11. Cleanup clears transient selected-element references and any command-time overlay.
 
 ### Automatic Whole-Page Reload
 
@@ -248,7 +289,7 @@ Long-lived extension settings:
 - element reload enabled
 - automatic reload enabled
 - automatic reload interval
-- highlight enabled
+- selected-element visualization mode
 - toast notifications enabled
 - toast duration
 - highlight color
@@ -297,6 +338,16 @@ Keep cleanup logic in content and tab-level navigation logic in background.
 
 Any new setting should be added to `settings-schema.js` first, then surfaced in background/content/settings consumers as needed.
 
+### 4. Selection state and selection visuals are separate
+
+`content-highlight.js` must keep the selected element available for command execution even when `elementSelectionStyle` is `none` or a half-mode.
+
+Do not clear `currentHighlightedElement` just because no selection-time visual is shown.
+
+### 5. Command-time visuals target the selected element
+
+Element reload may update a larger ancestor than the clicked node. Command-time blink/highlight should target the originally selected element when it is still connected, not the larger resolved reload ancestor.
+
 ## Assets
 
 - `images/`
@@ -307,7 +358,9 @@ Any new setting should be added to `settings-schema.js` first, then surfaced in 
 ## Recommended Editing Rules
 
 - If you add a setting, update `settings-schema.js` first.
+- If you add or rename an `elementSelectionStyle` mode, update `settings-schema.js`, `settings.html`, `content.js`, `content-highlight.js`, and `content-reload.js` together.
 - If you add a content feature, decide whether it belongs in base runtime, highlight, notifications, automatic mode, or reload behavior.
 - If you touch content globals, verify all later content files still have access to the names they use.
+- If you change element visualization behavior, test all five modes: `none`, `blink`, `half-blink`, `persistent`, and `half-persistent`.
 - If you change whole-page reload flow, test both cache-busted navigation and fallback reload.
 - If you change storage listeners, verify menus and popup stay in sync.

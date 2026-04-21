@@ -1,6 +1,7 @@
 //
 //  settings-core.js
 //  DeepReload Extension
+//  Provides settings-page runtime state, listeners, and schema bridge.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
@@ -9,8 +10,14 @@ import "./settings-schema.js";
 
 const {
   DEFAULT_SETTINGS,
+  ELEMENT_SELECTION_STYLE_BLINK,
+  ELEMENT_SELECTION_STYLE_HALF_BLINK,
+  ELEMENT_SELECTION_STYLE_HALF_PERSISTENT,
+  ELEMENT_SELECTION_STYLE_NONE,
+  ELEMENT_SELECTION_STYLE_PERSISTENT,
   clampAutoReloadIntervalSec,
   clampToastDurationSec,
+  normalizeElementSelectionStyle,
   normalizeHighlightColor,
   readSettings,
   sanitizeSettings,
@@ -19,8 +26,14 @@ const {
 
 export {
   DEFAULT_SETTINGS,
+  ELEMENT_SELECTION_STYLE_BLINK,
+  ELEMENT_SELECTION_STYLE_HALF_BLINK,
+  ELEMENT_SELECTION_STYLE_HALF_PERSISTENT,
+  ELEMENT_SELECTION_STYLE_NONE,
+  ELEMENT_SELECTION_STYLE_PERSISTENT,
   clampAutoReloadIntervalSec,
   clampToastDurationSec,
+  normalizeElementSelectionStyle,
   normalizeHighlightColor,
   readSettings,
   sanitizeSettings,

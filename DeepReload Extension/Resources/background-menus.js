@@ -1,6 +1,7 @@
 //
 //  background-menus.js
 //  DeepReload Extension
+//  Builds context menus and routes menu clicks to background actions.
 //
 //  Created by Sedoykin Alexey on 27/03/2026.
 //
@@ -39,12 +40,14 @@ async function applyContextMenuSettingsInner() {
     enabled: settings.enableDeepReloadPage
   });
 
-  browser.contextMenus.create({
-    id: MENU_ELEMENT_UNDER_CURSOR_ID,
-    title: "Element Under Cursor",
-    contexts: ["all"],
-    enabled: settings.enableDeepReloadElement
-  });
+  if (settings.enableDeepReloadElement) {
+    browser.contextMenus.create({
+      id: MENU_ELEMENT_UNDER_CURSOR_ID,
+      title: "Element Under Cursor",
+      contexts: ["all"],
+      enabled: true
+    });
+  }
 
   if (settings.enableAutoReloadFallback) {
     browser.contextMenus.create({
