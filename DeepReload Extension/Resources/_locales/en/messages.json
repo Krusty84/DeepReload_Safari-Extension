@@ -1,10 +1,18 @@
 {
   "extension_name": {
-    "message": "Deep Reload by Alexey Sedoykin",
+    "message": "Deep Reload",
     "description": "The display name for the extension."
   },
+  "extension_short_name": {
+    "message": "Deep Reload",
+    "description": "Short display name used in compact browser UI, including context menus."
+  },
+  "extension_author": {
+    "message": "Alexey Sedoykin",
+    "description": "Author name for browser UI that supports the WebExtension author field."
+  },
   "extension_description": {
-    "message": "Right-click to reload the whole page or the element under cursor, bypassing cache.",
+    "message": "Right-click to reload the whole page or the element under cursor, bypassing cache. Created by Alexey Sedoykin.",
     "description": "Short description shown in the browser UI."
   },
   "action_settings_title": {
