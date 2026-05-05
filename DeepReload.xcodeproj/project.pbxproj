@@ -277,6 +277,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "DeepReload Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Deep Reload";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Alexey Sedoykin";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -322,6 +323,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "DeepReload Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Deep Reload";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Alexey Sedoykin";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -362,7 +364,7 @@
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DeepReload/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = QazQaz;
+				INFOPLIST_KEY_CFBundleDisplayName = "Deep Reload";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Alexey Sedoykin";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -409,7 +411,7 @@
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DeepReload/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = QazQaz;
+				INFOPLIST_KEY_CFBundleDisplayName = "Deep Reload";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Alexey Sedoykin";
 				LD_RUNPATH_SEARCH_PATHS = (

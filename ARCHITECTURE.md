@@ -1,8 +1,13 @@
-# Deep Reload Extension Architecture
+# Deep Reload Architecture
 
 ## Overview
 
-`DeepReload Extension/Resources/` contains the browser extension payload for Deep Reload.
+Deep Reload is a macOS Safari Web Extension project. It has two user-facing parts:
+
+1. The macOS container app in `DeepReload/`.
+2. The WebExtension payload in `DeepReload Extension/Resources/`.
+
+The container app exists primarily to satisfy Safari extension distribution requirements and guide users through enabling the extension in Safari Settings. The WebExtension payload owns the actual reload behavior inside Safari.
 
 The extension is split into three execution contexts:
 
@@ -12,7 +17,32 @@ The extension is split into three execution contexts:
 
 The code is intentionally split into small files by responsibility, but the runtime is still tightly coupled by browser-extension boundaries and script loading order.
 
+## Repository Structure
+
+- `DeepReload/`
+  macOS container app target. Hosts the SwiftUI onboarding wizard and opens Safari's extension settings.
+- `DeepReload/Resources/`
+  Container-app resources used by onboarding pages.
+- `DeepReload Extension/`
+  Safari extension target wrapper and Safari web extension handler.
+- `DeepReload Extension/Resources/`
+  Browser extension payload: manifest, background scripts, content scripts, settings UI, locales, and icons.
+- `docs/`
+  Static privacy policy page.
+
 ## Entry Points
+
+- `DeepReloadApp.swift`
+  Main macOS app entry point. Installs `AppDelegate`, hides the empty Settings menu item, and shows the onboarding window on launch/reopen.
+
+- `OnboardingWindowController.swift`
+  Creates the centered, resizable macOS container window and hosts the SwiftUI onboarding view.
+
+- `ContentView.swift`
+  SwiftUI onboarding wizard. Pages are defined by `OnboardingPage.defaultPages`.
+
+- `ExtensionGuideActionController.swift`
+  Handles onboarding actions, including opening Safari extension settings through `SFSafariApplication.showPreferencesForExtension`.
 
 - `manifest.json`
   Declares the extension, permissions, content script order, background entry, popup, and options page.
@@ -33,6 +63,23 @@ The code is intentionally split into small files by responsibility, but the runt
   6. `content-reload.js`
 
 ## High-Level Runtime Model
+
+### Container App
+
+The container app is intentionally separate from extension business logic.
+
+- Shows a SwiftUI onboarding wizard at launch.
+- Uses bundled PNGs to explain setup and usage.
+- Keeps onboarding content data-driven through `OnboardingPage.defaultPages`.
+- Opens Safari's extension settings using SafariServices.
+- Does not perform page reloads or inspect Safari page content.
+
+Relevant files:
+
+- `DeepReloadApp.swift`
+- `OnboardingWindowController.swift`
+- `ContentView.swift`
+- `ExtensionGuideActionController.swift`
 
 ### Background
 
@@ -77,6 +124,7 @@ The settings layer edits persistent extension configuration stored in `browser.s
 - Renders toggles and numeric/color inputs.
 - Groups whole-page controls separately from element-under-cursor controls.
 - Disables element visualization controls when element reload is disabled.
+- Uses compact CSS spacing so Safari's toolbar popup can show all settings within its popup height constraints.
 - Saves partial changes immediately.
 - Reacts to storage changes so popup/options state stays in sync.
 
@@ -133,10 +181,12 @@ The old boolean `enableElementHighlight` is still read as a legacy key and migra
 
 ### `manifest.json`
 
-- Declares the extension name/description via locale keys.
+- Declares the extension name, short name, author, and description via locale keys.
 - Wires background, action popup, options page, and content scripts.
 - Defines permissions: `contextMenus`, `tabs`, `scripting`, `storage`.
 - Grants host access on all URLs.
+
+Safari's Extensions settings UI composes some labels from multiple metadata sources. The extension list name comes from the WebExtension manifest `name`. The detail panel version comes from manifest `version`. The "from ..." label is controlled by Safari and is tied to the containing app identity, not the WebExtension `author` field.
 
 ### `background-core.js`
 
@@ -235,6 +285,30 @@ Important: this file defines globals consumed by the later content files. Becaus
 - Boots the settings page.
 - Loads settings, renders controls, installs listeners, and handles disposal.
 
+### `DeepReloadApp.swift`
+
+- App entry point for the macOS container app.
+- Owns the app delegate bridge.
+- Removes the default app Settings command because the real settings live in the extension popup/options page.
+
+### `OnboardingWindowController.swift`
+
+- Creates the main `NSWindow`.
+- Centers the window at launch.
+- Sets the title, minimum size, maximum size, and standard macOS window behavior.
+
+### `ContentView.swift`
+
+- Defines `OnboardingPage`, the data model for onboarding pages.
+- Renders a wizard with a large image, headline, detail text, progress indicator, and Back/Forward/Get Started navigation.
+- Loads PNGs from either flat bundle resources or the nested `Resources/` folder. The nested fallback exists because Xcode may copy `DeepReload/Resources` as a folder when files are dragged into the synchronized project structure.
+
+### `ExtensionGuideActionController.swift`
+
+- Opens Safari extension settings for `com.krusty84.DeepReload.Extension`.
+- Publishes lightweight status feedback for the onboarding UI.
+- Closes the window when needed.
+
 ## Core Data Flows
 
 ### Whole-Page Reload
@@ -279,6 +353,15 @@ The `Element Under Cursor` menu item exists only when `enableDeepReloadElement` 
 4. Background/content/settings listeners react to `browser.storage.onChanged`.
 5. Menus and runtime UI update without needing a browser restart.
 
+### Container Onboarding
+
+1. User launches the macOS container app.
+2. `DeepReloadApp.swift` creates or reuses `OnboardingWindowController`.
+3. `ContentView.swift` renders the current onboarding page from `OnboardingPage.defaultPages`.
+4. User navigates with Back/Forward controls.
+5. On the final page, `Get Started` calls `openSafariSettings()`.
+6. `ExtensionGuideActionController.swift` asks Safari to show the settings screen for the extension.
+
 ## State and Persistence
 
 ### `browser.storage.local`
@@ -303,6 +386,10 @@ Short-lived per-tab/page coordination:
 - automatic page blink marker
 
 This storage is intentionally page-scoped rather than extension-global.
+
+### Container app state
+
+The onboarding page index is local SwiftUI state in `ContentView`. It is not persisted. The onboarding window is shown whenever the container app launches or reopens with no visible windows.
 
 ## Lifecycle and Cleanup Pattern
 
@@ -348,15 +435,26 @@ Do not clear `currentHighlightedElement` just because no selection-time visual i
 
 Element reload may update a larger ancestor than the clicked node. Command-time blink/highlight should target the originally selected element when it is still connected, not the larger resolved reload ancestor.
 
+### 6. Safari extension settings labels are partly Safari-controlled
+
+The extension manifest can set `name`, `short_name`, `author`, `version`, and `description`, but Safari decides how to compose some strings in Safari Settings. In particular, the "from ..." text in the extension detail panel comes from the containing app identity rather than the manifest `author`.
+
+### 7. Container resources may be nested in the bundle
+
+The Xcode project uses file-system-synchronized groups. Dragging files into `DeepReload/Resources` can result in the app bundle containing `Contents/Resources/Resources/...`. The onboarding image loader intentionally checks both flat and nested resource locations.
+
 ## Assets
 
-- `images/`
+- `DeepReload Extension/Resources/images/`
   Toolbar and store icons.
-- `_locales/en/messages.json`
+- `DeepReload Extension/Resources/_locales/en/messages.json`
   Locale strings for manifest metadata.
+- `DeepReload/Resources/*.png`
+  Onboarding wizard images used by the macOS container app.
 
 ## Recommended Editing Rules
 
+- If you add a container onboarding page, add its PNG under `DeepReload/Resources/` and then add an `OnboardingPage` entry in `ContentView.swift`.
 - If you add a setting, update `settings-schema.js` first.
 - If you add or rename an `elementSelectionStyle` mode, update `settings-schema.js`, `settings.html`, `content.js`, `content-highlight.js`, and `content-reload.js` together.
 - If you add a content feature, decide whether it belongs in base runtime, highlight, notifications, automatic mode, or reload behavior.
@@ -364,3 +462,4 @@ Element reload may update a larger ancestor than the clicked node. Command-time 
 - If you change element visualization behavior, test all five modes: `none`, `blink`, `half-blink`, `persistent`, and `half-persistent`.
 - If you change whole-page reload flow, test both cache-busted navigation and fallback reload.
 - If you change storage listeners, verify menus and popup stay in sync.
+- If you change extension display metadata, verify both Safari Settings and the context menu because Safari does not use every manifest field in every UI surface.
