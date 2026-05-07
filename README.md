@@ -1,4 +1,6 @@
-# What Is This?
+# Deep Reload [![Download on the Mac App Store](https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-mac-app-store.svg)](https://apps.apple.com/us/app/deep-reload/id6762883562?mt=12)
+
+## What Is This?
 
 Deep Reload is Safari Web Extension for reloading web pages and page elements while bypassing cache.
 
