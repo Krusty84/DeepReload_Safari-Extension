@@ -18,36 +18,12 @@ final class ExtensionGuideActionController: ObservableObject {
         case error
     }
 
-    private let extensionBundleIdentifier = "com.krusty84.DeepReload.Extension"
+
     let privacyPolicyURL = URL(string: "https://github.com/Krusty84/DeepReload-Safari-Extension-/blob/main/docs/index.html")!
 
     @Published var statusMessage: String?
     @Published var statusTone: StatusTone = .neutral
     @Published var isOpeningSettings = false
-
-    func openSafariSettings() {
-        guard !isOpeningSettings else { return }
-
-        isOpeningSettings = true
-        statusTone = .neutral
-        statusMessage = "Opening Safari Settings…"
-
-        SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { [weak self] error in
-            DispatchQueue.main.async {
-                guard let self else { return }
-
-                self.isOpeningSettings = false
-
-                if let error {
-                    self.statusTone = .error
-                    self.statusMessage = "Couldn’t open Safari Settings: \(error.localizedDescription)"
-                } else {
-                    self.statusTone = .success
-                    self.statusMessage = "Safari Settings opened. In Safari, enable DeepReload in the Extensions tab."
-                }
-            }
-        }
-    }
 
     func closeWindow() {
         NSApp.keyWindow?.close()

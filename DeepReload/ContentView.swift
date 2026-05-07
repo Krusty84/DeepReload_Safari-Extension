@@ -22,17 +22,17 @@ extension OnboardingPage {
     static let defaultPages = [
         OnboardingPage(
             imageName: "Icon",
-            headline: "Welcome to DeepReload",
-            details: "DeepReload adds Safari context-menu actions for refreshing a full page or a selected page element while bypassing stale cache."
+            headline: "Welcome to Deep Reload",
+            details: "Deep Reload adds Safari context-menu actions for refreshing a full page or a selected page element while bypassing stale cache."
         ),
         OnboardingPage(
             imageName: "DeepReloadSafariSettingsWindow",
             headline: "Enable the Safari extension",
-            details: "Open Safari Settings, choose Extensions, then enable DeepReload in the installed extensions list."
+            details: "Open Safari Settings, choose Extensions, then enable Deep Reload in the installed extensions list."
         ),
         OnboardingPage(
             imageName: "DeepReloadSettingsOverview",
-            headline: "Review DeepReload options",
+            headline: "Review Deep Reload options",
             details: "Use the extension settings to choose whole-page reload, element reload, automatic refresh, and the visual indication style that fits your workflow."
         ),
         OnboardingPage(
@@ -119,11 +119,10 @@ struct ContentView: View {
                 }
 
                 if isLastPage {
-                    Button(action: actionController.openSafariSettings) {
-                        Text(actionController.isOpeningSettings ? "Opening..." : "Get Started")
+                    Button(action: actionController.closeWindow) {
+                        Text("I am ready!")
                     }
                     .buttonStyle(TextNavigationButtonStyle())
-                    .disabled(actionController.isOpeningSettings)
                 } else {
                     Button(action: goForward) {
                         Image(systemName: "chevron.right")

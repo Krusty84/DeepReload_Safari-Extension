@@ -22,7 +22,7 @@ final class OnboardingWindowController: NSWindowController {
         )
 
         window.center()
-        window.title = "DeepReload"
+        window.title = "Deep Reload"
         window.minSize = NSSize(width: 560, height: 620)
         window.maxSize = NSSize(width: 980, height: 860)
         window.titleVisibility = .visible
